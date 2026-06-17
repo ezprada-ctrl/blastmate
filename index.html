@@ -579,21 +579,23 @@ body.on-fire #fire-overlay{opacity:1}
 
 
 /* ===== MODE KHUSUS: sembunyikan elemen gamifikasi ===== */
-body.mode-khusus .xp-section { display: none !important; }
-body.mode-khusus .stars-row { display: none !important; }
-body.mode-khusus .score-compare { display: none !important; }
-body.mode-khusus .compare-msg { display: none !important; }
-body.mode-khusus .xp-result { display: none !important; }
-body.mode-khusus .result-streak { display: none !important; }
+/* Elemen gamifikasi — disembunyikan di mode Khusus DAN Sumatif murni */
+body.mode-gamify-off .xp-section { display: none !important; }
+body.mode-gamify-off .stars-row { display: none !important; }
+body.mode-gamify-off .score-compare { display: none !important; }
+body.mode-gamify-off .compare-msg { display: none !important; }
+body.mode-gamify-off .xp-result { display: none !important; }
+body.mode-gamify-off .result-streak { display: none !important; }
+body.mode-gamify-off #levelup-popup { display: none !important; }
+body.mode-gamify-off #score-pill { display: none !important; }
+body.mode-gamify-off #streak-wrap { display: none !important; }
+body.mode-gamify-off #onfire-badge { display: none !important; }
+body.mode-gamify-off #fire-overlay { display: none !important; }
+body.mode-gamify-off.on-fire #bg-canvas { filter: none !important; }
+body.mode-gamify-off #corner-fire { display: none !important; }
+/* Elemen navigasi — hanya disembunyikan khusus mode Khusus (link diklat), TIDAK di Sumatif murni */
 body.mode-khusus #btn-edit-result { display: none !important; }
-body.mode-khusus #levelup-popup { display: none !important; }
 body.mode-khusus #btn-main-lagi { display: none !important; }
-body.mode-khusus #score-pill { display: none !important; }
-body.mode-khusus #streak-wrap { display: none !important; }
-body.mode-khusus #onfire-badge { display: none !important; }
-body.mode-khusus #fire-overlay { display: none !important; }
-body.mode-khusus.on-fire #bg-canvas { filter: none !important; }
-body.mode-khusus #corner-fire { display: none !important; }
 .opt-btn.selected-neutral{background:rgba(120,100,255,0.18);border-color:rgba(160,130,255,0.6);color:#c8d0ff;cursor:default;}
 </style>
 </head>
@@ -1401,7 +1403,7 @@ function applyStreakLevel(){
     wrap.classList.add('s5');qbox.classList.add('s5');
     icon.textContent='🔥';lbl.textContent='ON FIRE';
     corner.classList.remove('show');
-    if(!onFireMode&&!(isPlayerMode&&_sessionLinkType==='khusus')){
+    if(!onFireMode&&!((isPlayerMode&&_sessionLinkType==='khusus')||quizType==='sumatif')){
       onFireMode=true;
       document.body.classList.add('on-fire');
       startFire();
@@ -1830,7 +1832,7 @@ function submitQuiz(){
 let pendingLvlCb=null;
 function checkLevelUp(oldCoins,newCoins,cb){
   const ol=getLvlIdx(oldCoins),nl=getLvlIdx(newCoins);
-  if(nl>ol){if(isPlayerMode&&_sessionLinkType==='khusus'){cb();}else{const lv=getLvl(newCoins);document.getElementById('lu-icon').textContent=lv.icon;document.getElementById('lu-name').textContent=lv.name;document.getElementById('levelup-popup').classList.add('show');pendingLvlCb=cb;}}else cb();
+  if(nl>ol){if((isPlayerMode&&_sessionLinkType==='khusus')||quizType==='sumatif'){cb();}else{const lv=getLvl(newCoins);document.getElementById('lu-icon').textContent=lv.icon;document.getElementById('lu-name').textContent=lv.name;document.getElementById('levelup-popup').classList.add('show');pendingLvlCb=cb;}}else cb();
 }
 function closeLevelUp(){document.getElementById('levelup-popup').classList.remove('show');if(pendingLvlCb){pendingLvlCb();pendingLvlCb=null;}}
 
@@ -2266,6 +2268,7 @@ function launchCountdown(skipAcakCheck){
 }
 
 function _actuallyStartQuiz(){
+  _applyGameMode();
   currentQ=0;score=0;streak=0;maxStreak=0;sessionCoins=0;submitted=false;
   userAnswers=new Array(questions.length).fill(null);answeredCorrectly=new Array(questions.length).fill(null);
   hideMonsterBubble();_exitFire();
@@ -2893,6 +2896,7 @@ function setQuizType(type){
   const sb=document.getElementById('qtype-sumatif');
   if(fb)fb.className='qtype-btn'+(type==='formatif'?' active':'');
   if(sb)sb.className='qtype-btn sumatif'+(type==='sumatif'?' active':'');
+  if(typeof _applyGameMode==='function')_applyGameMode();
 }
 
 function saveEditorPassword(val){
@@ -4679,14 +4683,17 @@ function confirmLinkType() {
   generateShareLink(_selectedLinkType, minScore);
 }
 
-/* ===== MODE KHUSUS: apply body class ===== */
-function _applyModeKhusus() {
-  if (isPlayerMode && _sessionLinkType === 'khusus') {
-    document.body.classList.add('mode-khusus');
-  } else {
-    document.body.classList.remove('mode-khusus');
-  }
+/* ===== MODE KHUSUS & SUMATIF MURNI: apply body classes ===== */
+function _applyGameMode() {
+  const isKhusus = isPlayerMode && _sessionLinkType === 'khusus';
+  // mode-khusus: restriksi penuh (navigasi + gamifikasi) — hanya link Khusus
+  document.body.classList.toggle('mode-khusus', isKhusus);
+  // mode-gamify-off: hanya sembunyikan gamifikasi — berlaku utk Khusus DAN Sumatif murni
+  const isGamifyOff = isKhusus || (quizType === 'sumatif');
+  document.body.classList.toggle('mode-gamify-off', isGamifyOff);
 }
+// alias supaya pemanggilan lama tetap jalan
+function _applyModeKhusus(){ _applyGameMode(); }
 
 function loadScriptOnce(src){
   return new Promise((resolve,reject)=>{
