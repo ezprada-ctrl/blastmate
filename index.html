@@ -1676,7 +1676,13 @@ function renderQ(){
   applyStreakLevel();
 
   // restore bubble for already-answered q
-  if(userAnswers[currentQ]!==null&&!submitted){
+  if((isPlayerMode&&_sessionLinkType==='khusus')||quizType==='sumatif'){
+    // MODE KHUSUS & SUMATIF: sembunyikan bubble saat navigasi
+    if(!submitted) hideMonsterBubble();
+    else if(submitted&&answeredCorrectly[currentQ]!==null){
+      showMonsterBubble(answeredCorrectly[currentQ],false,false);
+    } else { hideMonsterBubble(); }
+  } else if(userAnswers[currentQ]!==null&&!submitted){
     const wasBreak=(answeredCorrectly[currentQ]===false&&streak===0);
     showMonsterBubble(answeredCorrectly[currentQ],onFireMode&&answeredCorrectly[currentQ],false);
   } else if(submitted&&answeredCorrectly[currentQ]!==null){
@@ -1698,8 +1704,8 @@ function renderQ(){
         else btn.classList.add('striked');
       } else {
         // during quiz: respect quizType
-        if(isPlayerMode && _sessionLinkType==='khusus'){
-          // MODE KHUSUS: tampilkan netral — hanya tandai pilihan user, tanpa benar/salah
+        if((isPlayerMode&&_sessionLinkType==='khusus')||quizType==='sumatif'){
+          // MODE KHUSUS & SUMATIF: tampilkan netral — hanya tandai pilihan user, tanpa benar/salah
           if(i===userAnswers[currentQ]){
             btn.classList.add('selected-neutral');
           } else {
