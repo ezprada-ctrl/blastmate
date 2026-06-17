@@ -99,6 +99,9 @@ body.on-fire #fire-overlay{opacity:1}
 #monster-bubble.correct-bg{border-color:rgba(80,200,100,0.4);box-shadow:0 0 20px rgba(80,200,100,0.15)}
 #monster-bubble.wrong-bg{border-color:rgba(255,80,80,0.4);box-shadow:0 0 20px rgba(255,80,80,0.15)}
 #monster-bubble.onfire-bg{border-color:rgba(255,100,0,0.6);box-shadow:0 0 25px rgba(255,80,0,0.3);animation:bubblePop .35s cubic-bezier(.34,1.56,.64,1)}
+#monster-bubble.neutral-bg{border-color:rgba(140,120,255,0.4);box-shadow:0 0 18px rgba(120,100,255,0.18);animation:bubblePop .3s cubic-bezier(.34,1.56,.64,1)}
+#milestone-toast{position:fixed;top:18px;left:50%;transform:translateX(-50%) translateY(-20px);background:rgba(20,16,40,0.97);border:1px solid rgba(160,140,255,0.4);border-radius:14px;padding:10px 20px;font-size:13px;color:#d8d0ff;box-shadow:0 8px 30px rgba(0,0,0,0.4);z-index:500;opacity:0;pointer-events:none;transition:opacity .35s,transform .35s}
+#milestone-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 @keyframes bubblePop{from{opacity:0;transform:scale(0.85) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}
 #mb-canvas{flex-shrink:0;border-radius:50%;background:rgba(255,255,255,0.04)}
 #mb-speech{flex:1;min-width:0}
@@ -593,6 +596,8 @@ body.mode-gamify-off #onfire-badge { display: none !important; }
 body.mode-gamify-off #fire-overlay { display: none !important; }
 body.mode-gamify-off.on-fire #bg-canvas { filter: none !important; }
 body.mode-gamify-off #corner-fire { display: none !important; }
+body.mode-gamify-off .prog-bar { display: none !important; }
+body.mode-gamify-off #rocket-scene { display: none !important; }
 /* Elemen navigasi — hanya disembunyikan khusus mode Khusus (link diklat), TIDAK di Sumatif murni */
 body.mode-khusus #btn-edit-result { display: none !important; }
 body.mode-khusus #btn-main-lagi { display: none !important; }
@@ -923,6 +928,7 @@ body.mode-khusus #btn-main-lagi { display: none !important; }
 
   <div id="screen-quiz" class="screen" style="position:relative">
     <canvas id="rocket-scene" style="position:fixed;left:0;right:0;bottom:0;width:100%;height:60vh;z-index:0;pointer-events:none"></canvas>
+    <canvas id="rocket-track-scene" style="position:fixed;left:0;right:0;top:0;width:100%;height:100%;z-index:0;pointer-events:none;display:none"></canvas>
     <div class="xp-section" style="position:relative;z-index:1">
       <button class="peta-btn" onclick="openLvlPanel()"><span class="peta-btn-dot"></span>Peta Level</button>
       <div class="xp-row">
@@ -1553,6 +1559,90 @@ function showMonsterBubble(correct,isOnFire,isBreak){
 }
 function hideMonsterBubble(){stopMb();const b=document.getElementById('monster-bubble');b.className='';b.id='monster-bubble';try{document.getElementById('mb-canvas').getContext('2d').clearRect(0,0,80,80);}catch(e){}}
 
+/* ===== KARAKTER NETRAL (mode Sumatif/Khusus) — tidak membocorkan benar/salah ===== */
+const NEUTRAL_CHARS = ['👽','🛸','🪐','⭐','🌙'];
+const NEUTRAL_MSGS = [
+  'Oke, dicatat!','Sip, lanjut!','Tercatat dengan baik.','Siap, soal berikutnya!','Noted!','Baik, kita lanjutkan.'
+];
+function showNeutralCharacterReaction(){
+  stopMb();
+  const bubble=document.getElementById('monster-bubble');
+  const canvas=document.getElementById('mb-canvas');
+  const ctx=canvas.getContext('2d');
+  const tag=document.getElementById('mb-result-tag');
+  const msg=document.getElementById('mb-msg');
+
+  const charIdx=~~(Math.random()*NEUTRAL_CHARS.length);
+  const char=NEUTRAL_CHARS[charIdx];
+  const text=NEUTRAL_MSGS[~~(Math.random()*NEUTRAL_MSGS.length)];
+
+  tag.textContent='';tag.className='';
+  msg.textContent=text;
+  bubble.id='monster-bubble';bubble.className='show neutral-bg';
+
+  ctx.clearRect(0,0,80,80);
+  ctx.font='40px sans-serif';
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  let bobT=0;
+  const start=performance.now();
+  function frame(now){
+    ctx.clearRect(0,0,80,80);
+    bobT=(now-start)/500;
+    const bob=Math.sin(bobT*3)*3;
+    ctx.save();
+    ctx.translate(40,40+bob);
+    ctx.font='40px sans-serif';
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(char,0,0);
+    ctx.restore();
+    mbRAF=requestAnimationFrame(frame);
+  }
+  mbRAF=requestAnimationFrame(frame);
+  // auto fade setelah beberapa detik supaya tidak menumpuk
+  clearTimeout(window._neutralBubbleTimeout);
+  window._neutralBubbleTimeout=setTimeout(()=>{
+    if(bubble.classList.contains('neutral-bg')) hideMonsterBubble();
+  },1800);
+}
+
+/* ===== PROGRESS MILESTONE (50% / 75%) — mode Sumatif/Khusus ===== */
+let _milestoneShown={half:false,threeQuarter:false};
+function _resetProgressMilestones(){ _milestoneShown={half:false,threeQuarter:false}; }
+function _checkProgressMilestone(){
+  const answeredN=userAnswers.filter(a=>a!==null).length;
+  const total=questions.length;
+  if(total<4) return; // quiz terlalu pendek, skip milestone
+  const halfPoint=Math.ceil(total*0.5);
+  const threeQPoint=Math.ceil(total*0.75);
+  if(!_milestoneShown.half && answeredN>=halfPoint){
+    _milestoneShown.half=true;
+    setTimeout(()=>showMilestoneToast('🚀 Sudah setengah jalan! Terus lanjutkan.'),950);
+  } else if(!_milestoneShown.threeQuarter && answeredN>=threeQPoint){
+    _milestoneShown.threeQuarter=true;
+    setTimeout(()=>showMilestoneToast('✨ Sebentar lagi selesai, pastikan jawabanmu ya! Semangat!'),950);
+  }
+}
+function showMilestoneToast(text){
+  let toast=document.getElementById('milestone-toast');
+  if(!toast){
+    toast=document.createElement('div');
+    toast.id='milestone-toast';
+    document.body.appendChild(toast);
+  }
+  toast.textContent=text;
+  toast.className='show';
+  clearTimeout(window._milestoneToastTimeout);
+  window._milestoneToastTimeout=setTimeout(()=>{ toast.className=''; },3200);
+}
+
+/* ===== ROCKET TRACK PROGRESS HOOK ===== */
+function _updateRocketTrackProgress(){
+  if(window._rocketTrack){
+    const answeredN=userAnswers.filter(a=>a!==null).length;
+    window._rocketTrack.setAnsweredCount(answeredN);
+  }
+}
+
 /* ===== PETA LEVEL ===== */
 function openLvlPanel(){buildLvlList();document.getElementById('lvl-overlay').classList.add('show');}
 function closeLvlPanel(){document.getElementById('lvl-overlay').classList.remove('show');}
@@ -1695,33 +1785,33 @@ function renderQ(){
 
   const optsEl=document.getElementById('opts');optsEl.innerHTML='';
   const isAnswered=userAnswers[currentQ]!==null&&!submitted;
+  const isSumatifNow = quizType==='sumatif';
   q.opts.forEach((o,i)=>{
     const btn=document.createElement('button');btn.className='opt-btn';btn.textContent=o;
-    if(submitted||isAnswered){
+    if(submitted){
       btn.disabled=true;
-      if(submitted){
-        // after submit: always reveal all answers
-        if(i===q.ans)btn.classList.add('correct');
-        else if(i===userAnswers[currentQ]&&userAnswers[currentQ]!==q.ans)btn.classList.add('wrong');
-        else btn.classList.add('striked');
+      // after submit: always reveal all answers
+      if(i===q.ans)btn.classList.add('correct');
+      else if(i===userAnswers[currentQ]&&userAnswers[currentQ]!==q.ans)btn.classList.add('wrong');
+      else btn.classList.add('striked');
+    } else if(isSumatifNow){
+      // MODE SUMATIF/KHUSUS: tetap clickable agar jawaban bisa diubah, tampilan netral
+      if(i===userAnswers[currentQ]){
+        btn.classList.add('selected-neutral');
+      } else if(isAnswered){
+        btn.classList.add('striked');
+      }
+      btn.onclick=()=>selectAnswer(i);
+    } else if(isAnswered){
+      btn.disabled=true;
+      if(i===userAnswers[currentQ]&&userAnswers[currentQ]!==q.ans){
+        btn.classList.add('wrong'); // always show the wrong one user picked
+      } else if(i===q.ans&&quizType==='formatif'){
+        btn.classList.add('correct'); // only show correct if formatif
+      } else if(i!==userAnswers[currentQ]){
+        btn.classList.add('striked');
       } else {
-        // during quiz: respect quizType
-        if((isPlayerMode&&_sessionLinkType==='khusus')||quizType==='sumatif'){
-          // MODE KHUSUS & SUMATIF: tampilkan netral — hanya tandai pilihan user, tanpa benar/salah
-          if(i===userAnswers[currentQ]){
-            btn.classList.add('selected-neutral');
-          } else {
-            btn.classList.add('striked');
-          }
-        } else if(i===userAnswers[currentQ]&&userAnswers[currentQ]!==q.ans){
-          btn.classList.add('wrong'); // always show the wrong one user picked
-        } else if(i===q.ans&&quizType==='formatif'){
-          btn.classList.add('correct'); // only show correct if formatif
-        } else if(i!==userAnswers[currentQ]){
-          btn.classList.add('striked');
-        } else {
-          btn.classList.add('striked');
-        }
+        btn.classList.add('striked');
       }
     } else {btn.onclick=()=>selectAnswer(i);}
     optsEl.appendChild(btn);
@@ -1733,29 +1823,51 @@ function renderQ(){
 }
 
 function selectAnswer(idx){
-  if(submitted||userAnswers[currentQ]!==null)return;
+  if(submitted)return;
+  const isSumatifFlow = quizType==='sumatif';
+  const alreadyAnswered = userAnswers[currentQ]!==null;
+  // Mode Sumatif/Khusus: boleh ubah jawaban selama belum submit. Mode Formatif: tetap terkunci setelah dijawab.
+  if(!isSumatifFlow && alreadyAnswered) return;
+
   const q=questions[currentQ];
   const correct=idx===q.ans;
   const prevStreak=streak;
+  const wasAnsweredBefore = userAnswers[currentQ]!==null;
+
+  // Koreksi score/streak lama jika ini adalah PENGUBAHAN jawaban (bukan jawaban pertama kali)
+  if(isSumatifFlow && wasAnsweredBefore){
+    const prevCorrect = answeredCorrectly[currentQ];
+    if(prevCorrect) score = Math.max(0, score-1);
+    // streak di-recompute penuh dari awal supaya akurat (lebih aman drpd in/decrement manual)
+  }
 
   userAnswers[currentQ]=idx;
   answeredCorrectly[currentQ]=correct;
 
-  if(quizType==='sumatif'){
+  if(isSumatifFlow){
     // SUMATIF: hanya sfxClick biasa, tidak ada visual/audio feedback benar/salah
     sfxClick();
-    score+=correct?1:0;
-    streak+=correct?1:0;
-    if(correct&&streak>maxStreak)maxStreak=streak;
-    if(!correct)streak=0;
-    // disable semua tombol tanpa highlight
-    const btns=document.getElementById('opts').querySelectorAll('.opt-btn');
-    btns.forEach((btn,i)=>{
-      btn.disabled=true;
-      if(i===idx) btn.style.opacity='0.55'; // sedikit redup untuk feedback pilihan
-    });
+    if(!wasAnsweredBefore){
+      score+=correct?1:0;
+      streak+=correct?1:0;
+      if(correct&&streak>maxStreak)maxStreak=streak;
+      if(!correct)streak=0;
+    } else {
+      // recompute score & streak dari seluruh jawaban yang sudah ada, akurat walau diubah-ubah
+      let s=0, cur=0, mx=0;
+      for(let i=0;i<questions.length;i++){
+        if(answeredCorrectly[i]===true){ s++; cur++; if(cur>mx)mx=cur; }
+        else if(answeredCorrectly[i]===false){ cur=0; }
+      }
+      score=s; maxStreak=mx;
+    }
+    // disable/re-enable tombol tanpa highlight, beri karakter respon netral
+    renderQ();
     updateDots();updateAnsweredCount();
-    if(currentQ<questions.length-1)setTimeout(()=>navQ(1),900);
+    _updateRocketTrackProgress();
+    _checkProgressMilestone();
+    showNeutralCharacterReaction();
+    if(!wasAnsweredBefore && currentQ<questions.length-1)setTimeout(()=>navQ(1),900);
     return;
   }
 
@@ -1813,18 +1925,27 @@ function submitQuiz(){
   if(bestStreak<maxStreak)bestStreak=maxStreak;
   save();if(highScore<score)highScore=score;save();
   _exitFire();renderQ();
-  const passScore=score/questions.length>=0.7;
-  if(passScore){
+
+  const isGamifyOffFlow = (isPlayerMode&&_sessionLinkType==='khusus')||quizType==='sumatif';
+  // passScore: pakai _sessionMinScore dinamis utk mode Khusus, default 70% utk Sumatif murni/Formatif
+  const minPct = (isPlayerMode&&_sessionLinkType==='khusus') ? (_sessionMinScore/100) : 0.7;
+  const passScore=score/questions.length>=minPct;
+
+  if(isGamifyOffFlow){
+    // ROKET TRACK BARU: pastikan posisi akhir = semua soal terjawab, lalu trigger fail/success
+    if(window._rocketTrack){
+      window._rocketTrack.setAnsweredCount(questions.length);
+      setTimeout(()=>{
+        if(passScore){ sfxTakeoff(); window._rocketTrack.triggerSuccess(); }
+        else { sfxFailAttempt(); window._rocketTrack.triggerFail(); }
+      },350);
+    }
+  } else if(passScore){
     sfxTakeoff();
     if(window._rocketScene)window._rocketScene.triggerTakeoff();
   } else {
     sfxFailAttempt();
     if(window._rocketScene)window._rocketScene.triggerFail();
-    // for sumatif: also add damage based on final score
-    if(quizType==='sumatif'&&window._rocketScene){
-      const wrongCount=answeredCorrectly.filter(a=>a===false).length;
-      window._rocketScene.addDamage(wrongCount,questions.length);
-    }
   }
   setTimeout(()=>checkLevelUp(oldCoins,totalCoins,()=>showResult()),400);
 }
@@ -2269,12 +2390,14 @@ function launchCountdown(skipAcakCheck){
 
 function _actuallyStartQuiz(){
   _applyGameMode();
+  _resetProgressMilestones();
   currentQ=0;score=0;streak=0;maxStreak=0;sessionCoins=0;submitted=false;
   userAnswers=new Array(questions.length).fill(null);answeredCorrectly=new Array(questions.length).fill(null);
   hideMonsterBubble();_exitFire();
   document.getElementById('corner-fire').classList.remove('show');
   document.getElementById('onfire-badge').className='onfire-badge';
   streak=0;applyStreakLevel(); // reset streak visuals
+  if(window._rocketTrack){window._rocketTrack.setTotalSteps(questions.length);window._rocketTrack.setAnsweredCount(0);}
   showScreen('quiz');buildDots();updateXPBar();applyStreakLevel();renderQ();startQuizTimer();
   // show music bar — works both for direct play and shared link
   const _mbar=document.getElementById('music-bar');
@@ -4691,9 +4814,266 @@ function _applyGameMode() {
   // mode-gamify-off: hanya sembunyikan gamifikasi — berlaku utk Khusus DAN Sumatif murni
   const isGamifyOff = isKhusus || (quizType === 'sumatif');
   document.body.classList.toggle('mode-gamify-off', isGamifyOff);
+
+  // Toggle roket lama vs roket track baru
+  const trackCanvas = document.getElementById('rocket-track-scene');
+  if(isGamifyOff){
+    if(trackCanvas) trackCanvas.style.display='block';
+    if(window._rocketScene) window._rocketScene.stop();
+    if(window._rocketTrack){
+      window._rocketTrack.setTotalSteps(questions ? questions.length : 10);
+      window._rocketTrack.start();
+    }
+  } else {
+    if(trackCanvas) trackCanvas.style.display='none';
+    if(window._rocketTrack) window._rocketTrack.stop();
+  }
 }
 // alias supaya pemanggilan lama tetap jalan
 function _applyModeKhusus(){ _applyGameMode(); }
+
+/* ================================================================
+   ROCKET TRACK ENGINE — khusus mode Khusus & Sumatif murni
+   - Track berkelok-kelok di background, planet biru berotasi di pojok kanan atas
+   - Posisi roket = jumlah soal terjawab (bukan benar/salah, netral)
+   - Submit gagal: roket meledak di titik checkpoint terakhir (belum sampai planet)
+   - Submit lulus: roket lanjut terbang dari checkpoint menuju planet
+   ================================================================ */
+(function(){
+  const C = document.getElementById('rocket-track-scene');
+  if(!C) return;
+  const ctx = C.getContext('2d');
+  let W,H,raf=null,t=0;
+  let active=false;
+  let totalSteps=10; // jumlah soal, diupdate via setTotalSteps
+  let answeredCount=0; // jumlah soal terjawab (target progress)
+  let smoothProgress=0; // 0..1 posisi roket di sepanjang path utama (interpolasi halus)
+  let mode='idle'; // idle | flying | exploding | success
+  let modeT=0;
+  let explodeParts=[];
+  let planetRot=0;
+
+  function resize(){
+    W=C.width=C.offsetWidth*(window.devicePixelRatio||1);
+    H=C.height=C.offsetHeight*(window.devicePixelRatio||1);
+    ctx.setTransform(window.devicePixelRatio||1,0,0,window.devicePixelRatio||1,0,0);
+    W=C.offsetWidth; H=C.offsetHeight;
+  }
+  window.addEventListener('resize', ()=>{ if(active) resize(); });
+
+  // ---- Path generator: berkelok-kelok dari kiri-bawah ke checkpoint, lalu jarak jauh ke planet pojok kanan-atas ----
+  function getPathPoints(){
+    // Titik kontrol path utama (checkpoint progress) — berkelok mengikuti lebar layar
+    const margin = Math.min(60, W*0.08);
+    const pts = [];
+    const nWaves = 4;
+    const startX = margin, startY = H*0.88;
+    const checkpointX = W*0.62, checkpointY = H*0.30;
+    for(let i=0;i<=nWaves;i++){
+      const f = i/nWaves;
+      const x = startX + (checkpointX-startX)*f;
+      const waveY = Math.sin(f*Math.PI*nWaves*0.5)* (H*0.10);
+      const y = startY + (checkpointY-startY)*f + waveY*(1-f*0.3);
+      pts.push({x,y});
+    }
+    return pts; // titik terakhir = checkpoint (akhir track utama, BELUM planet)
+  }
+
+  function getPlanetPos(){
+    return { x: W*0.88, y: H*0.12, r: Math.min(W,H)*0.07 };
+  }
+
+  // Catmull-rom-ish smooth point along polyline pts at param u (0..1)
+  function pointOnPath(pts, u){
+    if(u<=0) return pts[0];
+    if(u>=1) return pts[pts.length-1];
+    const segCount = pts.length-1;
+    const segF = u*segCount;
+    const segI = Math.min(segCount-1, Math.floor(segF));
+    const localT = segF-segI;
+    const a = pts[segI], b = pts[segI+1];
+    return { x: a.x+(b.x-a.x)*localT, y: a.y+(b.y-a.y)*localT };
+  }
+
+  function drawPlanet(){
+    const p = getPlanetPos();
+    ctx.save();
+    ctx.translate(p.x,p.y);
+    // glow
+    const glow = ctx.createRadialGradient(0,0,p.r*0.5,0,0,p.r*2.2);
+    glow.addColorStop(0,'rgba(80,160,255,0.35)');
+    glow.addColorStop(1,'rgba(80,160,255,0)');
+    ctx.beginPath(); ctx.arc(0,0,p.r*2.2,0,Math.PI*2); ctx.fillStyle=glow; ctx.fill();
+    // body
+    ctx.rotate(planetRot);
+    const bodyGrad = ctx.createLinearGradient(-p.r,-p.r,p.r,p.r);
+    bodyGrad.addColorStop(0,'#7fd0ff');
+    bodyGrad.addColorStop(0.5,'#3a7fe0');
+    bodyGrad.addColorStop(1,'#1a3a8a');
+    ctx.beginPath(); ctx.arc(0,0,p.r,0,Math.PI*2); ctx.fillStyle=bodyGrad; ctx.fill();
+    // surface swirls
+    ctx.globalAlpha=0.35;
+    ctx.strokeStyle='#cdeeff';
+    for(let i=0;i<3;i++){
+      ctx.beginPath();
+      ctx.ellipse(0,p.r*(-0.3+i*0.3), p.r*0.85, p.r*0.18, i*0.6, 0, Math.PI*1.4);
+      ctx.lineWidth=p.r*0.08;
+      ctx.stroke();
+    }
+    ctx.globalAlpha=1;
+    ctx.restore();
+  }
+
+  function drawTrackPath(pts){
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x,pts[0].y);
+    for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x,pts[i].y);
+    ctx.strokeStyle='rgba(160,140,255,0.16)';
+    ctx.lineWidth=3;
+    ctx.setLineDash([6,8]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+
+  function drawCheckpointToPlanetLine(checkpoint, planet){
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(checkpoint.x,checkpoint.y);
+    ctx.lineTo(planet.x,planet.y);
+    ctx.strokeStyle='rgba(160,140,255,0.10)';
+    ctx.lineWidth=2;
+    ctx.setLineDash([4,10]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+
+  function drawRocketAt(x,y,angle,scale){
+    ctx.save();
+    ctx.translate(x,y);
+    ctx.rotate(angle);
+    ctx.scale(scale,scale);
+    // thruster flame
+    const flameSize=0.7+0.3*Math.sin(t*14);
+    const fg=ctx.createRadialGradient(0,16,2,0,30,18*flameSize);
+    fg.addColorStop(0,'rgba(255,255,200,0.95)');
+    fg.addColorStop(0.4,'rgba(255,150,40,0.85)');
+    fg.addColorStop(1,'rgba(255,60,0,0)');
+    ctx.beginPath(); ctx.ellipse(0,20,7*flameSize,16*flameSize,0,0,Math.PI*2); ctx.fillStyle=fg; ctx.fill();
+    // body
+    ctx.beginPath();
+    ctx.moveTo(0,-18);
+    ctx.quadraticCurveTo(9,-4,8,10);
+    ctx.lineTo(-8,10);
+    ctx.quadraticCurveTo(-9,-4,0,-18);
+    ctx.closePath();
+    const bg=ctx.createLinearGradient(-8,0,8,0);
+    bg.addColorStop(0,'#d8d8ee');
+    bg.addColorStop(0.5,'#f5f5ff');
+    bg.addColorStop(1,'#a8a8d0');
+    ctx.fillStyle=bg; ctx.fill();
+    // nose cone accent
+    ctx.beginPath(); ctx.moveTo(0,-18); ctx.lineTo(4,-6); ctx.lineTo(-4,-6); ctx.closePath();
+    ctx.fillStyle='#9b5fff'; ctx.fill();
+    // window
+    ctx.beginPath(); ctx.arc(0,-2,2.6,0,Math.PI*2); ctx.fillStyle='#2a2a4a'; ctx.fill();
+    // fins
+    ctx.fillStyle='#7a5fd8';
+    ctx.beginPath(); ctx.moveTo(-8,2); ctx.lineTo(-15,11); ctx.lineTo(-8,9); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(8,2); ctx.lineTo(15,11); ctx.lineTo(8,9); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+
+  function spawnExplosion(x,y){
+    explodeParts=[];
+    const n=26;
+    for(let i=0;i<n;i++){
+      const ang=Math.random()*Math.PI*2;
+      const sp=1.5+Math.random()*4;
+      explodeParts.push({
+        x,y,
+        vx:Math.cos(ang)*sp, vy:Math.sin(ang)*sp,
+        life:1, r:2+Math.random()*4,
+        col: Math.random()<0.5?'255,160,40':'255,80,40'
+      });
+    }
+  }
+
+  function drawExplosion(){
+    explodeParts.forEach(p=>{
+      ctx.beginPath();
+      ctx.arc(p.x,p.y,p.r*p.life,0,Math.PI*2);
+      ctx.fillStyle=`rgba(${p.col},${p.life})`;
+      ctx.fill();
+      p.x+=p.vx; p.y+=p.vy; p.vy+=0.05; p.life-=0.025;
+    });
+    explodeParts=explodeParts.filter(p=>p.life>0);
+  }
+
+  function draw(){
+    if(!active){ raf=null; return; }
+    t+=0.02;
+    ctx.clearRect(0,0,W,H);
+
+    const pts = getPathPoints();
+    const checkpoint = pts[pts.length-1];
+    const planet = getPlanetPos();
+
+    drawTrackPath(pts);
+    drawCheckpointToPlanetLine(checkpoint, planet);
+    planetRot += 0.004;
+    drawPlanet();
+
+    // smooth progress menuju target (jumlah soal terjawab / total)
+    const targetProgress = totalSteps>0 ? Math.min(1, answeredCount/totalSteps) : 0;
+    smoothProgress += (targetProgress - smoothProgress)*0.12;
+
+    if(mode==='idle' || mode==='flying'){
+      const pos = pointOnPath(pts, smoothProgress);
+      // sedikit lihat arah gerak untuk rotasi roket
+      const aheadPos = pointOnPath(pts, Math.min(1,smoothProgress+0.01));
+      const angle = Math.atan2(aheadPos.x-pos.x, -(aheadPos.y-pos.y));
+      drawRocketAt(pos.x,pos.y,angle,1);
+    } else if(mode==='exploding'){
+      modeT+=0.02;
+      if(modeT<0.05) spawnExplosion(checkpoint.x,checkpoint.y);
+      drawExplosion();
+    } else if(mode==='success'){
+      modeT+=0.02;
+      const u = Math.min(1, modeT*0.6); // dari checkpoint menuju planet
+      const x = checkpoint.x + (planet.x-checkpoint.x)*u;
+      const y = checkpoint.y + (planet.y-checkpoint.y)*u;
+      const angle = Math.atan2(planet.x-checkpoint.x, -(planet.y-checkpoint.y));
+      drawRocketAt(x,y,angle,1-u*0.3);
+      if(u>=1 && explodeParts.length===0){
+        // tiba di planet — sedikit kilatan
+        spawnExplosion(planet.x,planet.y);
+      }
+      drawExplosion();
+    }
+
+    raf = requestAnimationFrame(draw);
+  }
+
+  window._rocketTrack = {
+    start(){
+      active=true; mode='idle'; modeT=0; explodeParts=[]; smoothProgress=0;
+      resize();
+      if(!raf) raf=requestAnimationFrame(draw);
+    },
+    stop(){
+      active=false;
+      if(raf){ cancelAnimationFrame(raf); raf=null; }
+      ctx.clearRect(0,0,W,H);
+    },
+    setTotalSteps(n){ totalSteps=n; },
+    setAnsweredCount(n){ answeredCount=n; },
+    triggerFail(){ mode='exploding'; modeT=0; },
+    triggerSuccess(){ mode='success'; modeT=0; explodeParts=[]; }
+  };
+})();
 
 function loadScriptOnce(src){
   return new Promise((resolve,reject)=>{
