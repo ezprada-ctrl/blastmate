@@ -577,6 +577,15 @@ body.on-fire #fire-overlay{opacity:1}
 .import-q-opt{font-size:11px;padding:3px 8px;border-radius:5px;color:#8888bb;background:rgba(255,255,255,0.03);border:1px solid rgba(120,100,255,0.15)}
 .import-q-opt.correct{color:#7fffa8;background:rgba(80,200,120,0.1);border-color:rgba(80,200,120,0.3)}
 
+
+/* ===== MODE KHUSUS: sembunyikan elemen gamifikasi ===== */
+body.mode-khusus .xp-section { display: none !important; }
+body.mode-khusus .stars-row { display: none !important; }
+body.mode-khusus .score-compare { display: none !important; }
+body.mode-khusus .compare-msg { display: none !important; }
+body.mode-khusus .xp-result { display: none !important; }
+body.mode-khusus .result-streak { display: none !important; }
+body.mode-khusus #btn-edit-result { display: none !important; }
 </style>
 </head>
 <body>
@@ -960,7 +969,7 @@ body.on-fire #fire-overlay{opacity:1}
       <div class="result-sub" id="result-sub"></div>
       <div class="result-streak" id="result-streak"></div>
       <div class="btn-row">
-        <button class="btn-outline" onclick="handleEditClick()">Edit</button>
+        <button class="btn-outline" id="btn-edit-result" onclick="handleEditClick()">Edit</button>
         <button class="btn-blue" onclick="handleRestartClick()">Main lagi!</button>
         <button class="btn-lanjut" id="btn-lanjut-slide" onclick="handleLanjutClick()" disabled style="display:none">▶ Lanjut</button>
       </div>
@@ -2715,6 +2724,7 @@ async function checkShareLink(){
       _sessionLinkType=session.settings.linkType||'umum';
       _sessionMinScore=typeof session.settings.minScore==='number'?session.settings.minScore:70;
     }
+    _applyModeKhusus();
     }
     document.getElementById('loading-sub').textContent='Soal berhasil dimuat...';
     // sync qcount UI with loaded question count
@@ -4632,6 +4642,15 @@ function confirmLinkType() {
   }
   closeModal('modal-linktype');
   generateShareLink(_selectedLinkType, minScore);
+}
+
+/* ===== MODE KHUSUS: apply body class ===== */
+function _applyModeKhusus() {
+  if (isPlayerMode && _sessionLinkType === 'khusus') {
+    document.body.classList.add('mode-khusus');
+  } else {
+    document.body.classList.remove('mode-khusus');
+  }
 }
 
 function loadScriptOnce(src){
