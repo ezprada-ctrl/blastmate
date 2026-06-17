@@ -1942,7 +1942,7 @@ function submitQuiz(){
     }
     // beri waktu animasi roket (terbang ke planet / meledak) selesai dimainkan dulu
     // sebelum popup result muncul menutupi layar
-    setTimeout(()=>checkLevelUp(oldCoins,totalCoins,()=>showResult()),2500);
+    setTimeout(()=>checkLevelUp(oldCoins,totalCoins,()=>showResult()),3000);
     return;
   } else if(passScore){
     sfxTakeoff();
@@ -4905,19 +4905,58 @@ function _applyModeKhusus(){ _applyGameMode(); }
   }
 
   // ---- Path generator: berkelok-kelok dari kiri-bawah ke checkpoint, lalu jarak jauh ke planet pojok kanan-atas ----
+  function getQBoxRect(){
+    const qbox=document.getElementById('q-box');
+    const canvasRect=C.getBoundingClientRect();
+    if(!qbox || !canvasRect.width) return null;
+    const r=qbox.getBoundingClientRect();
+    // konversi ke koordinat relatif canvas, dengan sedikit padding agar tidak terlalu mepet
+    const pad=14;
+    return {
+      left: r.left-canvasRect.left-pad,
+      right: r.right-canvasRect.left+pad,
+      top: r.top-canvasRect.top-pad,
+      bottom: r.bottom-canvasRect.top+pad
+    };
+  }
+
+  // Dorong titik keluar dari box jika berada di dalamnya — pilih sisi terdekat (kiri/kanan/atas/bawah)
+  function pushOutsideBox(x,y,box){
+    if(!box) return {x,y};
+    if(x>box.left && x<box.right && y>box.top && y<box.bottom){
+      const distLeft=x-box.left, distRight=box.right-x;
+      const distTop=y-box.top, distBottom=box.bottom-y;
+      const minDist=Math.min(distLeft,distRight,distTop,distBottom);
+      if(minDist===distLeft) return {x:box.left, y};
+      if(minDist===distRight) return {x:box.right, y};
+      if(minDist===distTop) return {x, y:box.top};
+      return {x, y:box.bottom};
+    }
+    return {x,y};
+  }
+
   function getPathPoints(){
-    // Titik kontrol path utama (checkpoint progress) — berkelok mengikuti lebar layar
+    const box=getQBoxRect();
     const margin = Math.min(60, W*0.08);
     const pts = [];
-    const nWaves = 4;
-    const startX = margin, startY = H*0.88;
+    const nPoints = 7; // lebih banyak titik kontrol agar kelokan lebih variatif & halus
+    const startX = margin, startY = H*0.90;
     const checkpointX = W*0.62, checkpointY = H*0.30;
-    for(let i=0;i<=nWaves;i++){
-      const f = i/nWaves;
-      const x = startX + (checkpointX-startX)*f;
-      const waveY = Math.sin(f*Math.PI*nWaves*0.5)* (H*0.10);
-      const y = startY + (checkpointY-startY)*f + waveY*(1-f*0.3);
-      pts.push({x,y});
+
+    // Sisi-sisi bergantian: kiri box, bawah box, kanan box — supaya track berkelok variatif
+    // tanpa pernah menembus tengah box (area di belakang box soal)
+    for(let i=0;i<=nPoints;i++){
+      const f = i/nPoints;
+      let x = startX + (checkpointX-startX)*f;
+      let y = startY + (checkpointY-startY)*f;
+      // variasi gelombang kecil berbeda tiap segmen, supaya tidak monoton di satu sisi
+      const waveAmp = Math.min(W,H)*0.06;
+      const wave = Math.sin(f*Math.PI*3 + 0.6)*waveAmp*(1-f*0.25);
+      // arah dorongan wave bergantian horizontal/vertikal tergantung posisi f
+      if(f<0.5){ x += wave*0.5; } else { y += wave*0.4; }
+
+      const pushed = pushOutsideBox(x,y,box);
+      pts.push(pushed);
     }
     return pts; // titik terakhir = checkpoint (akhir track utama, BELUM planet)
   }
@@ -5108,20 +5147,29 @@ function _applyModeKhusus(){ _applyGameMode(); }
       if(modeT<0.05) spawnExplosion(checkpoint.x,checkpoint.y,true); // ledakan besar saat gagal
       drawExplosion();
     } else if(mode==='success'){
-      modeT+=0.02;
-      // easing deselerasi — cepat di awal, melambat saat mendekati planet (kesan mendarat halus)
-      const rawU = Math.min(1, modeT*0.55);
-      const u = 1-Math.pow(1-rawU,3); // ease-out cubic
+      modeT+=0.015; // lebih lambat dari sebelumnya — kesan mendarat pelan
+      // easing deselerasi kuat — cepat di awal, sangat melambat saat mendekati planet
+      const rawU = Math.min(1, modeT*0.5);
+      const u = 1-Math.pow(1-rawU,4); // ease-out quartic, lebih halus mendekati akhir
       const fullDx = planet.x-checkpoint.x, fullDy = planet.y-checkpoint.y;
       const fullDist = Math.sqrt(fullDx*fullDx+fullDy*fullDy) || 1;
       // titik mendarat = di tepi planet (radius + sedikit jarak), BUKAN di titik pusat
-      const landDist = Math.max(0, fullDist - planet.r*1.3);
+      const landDist = Math.max(0, fullDist - planet.r*1.25);
       const landX = checkpoint.x + fullDx*(landDist/fullDist);
       const landY = checkpoint.y + fullDy*(landDist/fullDist);
       const x = checkpoint.x + (landX-checkpoint.x)*u;
       const y = checkpoint.y + (landY-checkpoint.y)*u;
-      const angle = Math.atan2(planet.x-checkpoint.x, -(planet.y-checkpoint.y));
-      const scale = 1-u*0.25; // sedikit mengecil seiring menjauh/mendekat planet (depth)
+
+      // sudut menghadap planet (moncong ke arah planet, dipakai di awal perjalanan)
+      const angleToPlanet = Math.atan2(planet.x-checkpoint.x, -(planet.y-checkpoint.y));
+      // flipT: 0 di awal (moncong ke planet) -> 1 di akhir (moncong menjauh, ekor ke planet)
+      // mulai berputar di 55% perjalanan, selesai berputar persis saat mendarat (u=1)
+      const flipStart=0.55;
+      const flipT = u<flipStart ? 0 : (u-flipStart)/(1-flipStart);
+      const flipEase = flipT*flipT*(3-2*flipT); // smoothstep
+      const angle = angleToPlanet + Math.PI*flipEase; // rotasi 180° (PI radian) secara halus
+
+      const scale = 1-u*0.2;
       drawRocketAt(x,y,angle,scale);
       if(u>=1 && !window._rtLandedFlag){
         window._rtLandedFlag=true;
