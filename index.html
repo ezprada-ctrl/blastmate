@@ -1845,8 +1845,8 @@ function selectAnswer(idx){
   answeredCorrectly[currentQ]=correct;
 
   if(isSumatifFlow){
-    // SUMATIF: hanya sfxClick biasa, tidak ada visual/audio feedback benar/salah
-    sfxClick();
+    // SUMATIF: suara roket maju (whoosh), tidak ada feedback benar/salah
+    sfxRocketWhoosh();
     if(!wasAnsweredBefore){
       score+=correct?1:0;
       streak+=correct?1:0;
@@ -1940,6 +1940,10 @@ function submitQuiz(){
         else { sfxFailAttempt(); window._rocketTrack.triggerFail(); }
       },350);
     }
+    // beri waktu animasi roket (terbang ke planet / meledak) selesai dimainkan dulu
+    // sebelum popup result muncul menutupi layar
+    setTimeout(()=>checkLevelUp(oldCoins,totalCoins,()=>showResult()),2500);
+    return;
   } else if(passScore){
     sfxTakeoff();
     if(window._rocketScene)window._rocketScene.triggerTakeoff();
@@ -2065,6 +2069,32 @@ function sfxClick(){
 }
 
 /* --- CLING SFX: jawaban benar — cling! low oktav, metalik hangat --- */
+/* --- ROCKET WHOOSH SFX: roket maju di track (mode Sumatif/Khusus) --- */
+function sfxRocketWhoosh(){
+  try{
+    const ac=getSfxAC(),t=ac.currentTime;
+    // whoosh utama — noise-like sweep turun lalu filter
+    const osc=ac.createOscillator(),gain=ac.createGain();
+    osc.connect(gain);gain.connect(ac.destination);
+    osc.type='sawtooth';
+    osc.frequency.setValueAtTime(620,t);
+    osc.frequency.exponentialRampToValueAtTime(180,t+0.22);
+    gain.gain.setValueAtTime(0.001,t);
+    gain.gain.linearRampToValueAtTime(0.12,t+0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001,t+0.24);
+    osc.start(t);osc.stop(t+0.25);
+    // lapisan thruster — frekuensi tinggi pendek, kesan dorongan
+    const osc2=ac.createOscillator(),gain2=ac.createGain();
+    osc2.connect(gain2);gain2.connect(ac.destination);
+    osc2.type='triangle';
+    osc2.frequency.setValueAtTime(1400,t);
+    osc2.frequency.exponentialRampToValueAtTime(700,t+0.1);
+    gain2.gain.setValueAtTime(0.06,t);
+    gain2.gain.exponentialRampToValueAtTime(0.001,t+0.12);
+    osc2.start(t);osc2.stop(t+0.13);
+  }catch(e){}
+}
+
 function sfxCling(){
   try{
     const ac=getSfxAC(),t=ac.currentTime;
@@ -4854,12 +4884,20 @@ function _applyModeKhusus(){ _applyGameMode(); }
   let planetRot=0;
 
   function resize(){
-    W=C.width=C.offsetWidth*(window.devicePixelRatio||1);
-    H=C.height=C.offsetHeight*(window.devicePixelRatio||1);
+    const ow=C.offsetWidth, oh=C.offsetHeight;
+    if(ow===0||oh===0) return false; // belum punya dimensi valid, skip
+    W=C.width=ow*(window.devicePixelRatio||1);
+    H=C.height=oh*(window.devicePixelRatio||1);
     ctx.setTransform(window.devicePixelRatio||1,0,0,window.devicePixelRatio||1,0,0);
-    W=C.offsetWidth; H=C.offsetHeight;
+    W=ow; H=oh;
+    return true;
   }
   window.addEventListener('resize', ()=>{ if(active) resize(); });
+  // ResizeObserver: tangani race condition saat canvas baru di-set display:block
+  // (offsetWidth/Height masih 0 sesaat sebelum browser selesai layout)
+  if(window.ResizeObserver){
+    new ResizeObserver(()=>{ if(active) resize(); }).observe(C);
+  }
 
   // ---- Path generator: berkelok-kelok dari kiri-bawah ke checkpoint, lalu jarak jauh ke planet pojok kanan-atas ----
   function getPathPoints(){
@@ -4986,16 +5024,18 @@ function _applyModeKhusus(){ _applyGameMode(); }
     ctx.restore();
   }
 
-  function spawnExplosion(x,y){
+  function spawnExplosion(x,y,big){
     explodeParts=[];
-    const n=26;
+    const n = big ? 70 : 26; // ledakan besar (gagal) vs kecil (tiba di planet)
+    const spMul = big ? 3 : 1;
+    const rMul = big ? 3 : 1;
     for(let i=0;i<n;i++){
       const ang=Math.random()*Math.PI*2;
-      const sp=1.5+Math.random()*4;
+      const sp=(1.5+Math.random()*4)*spMul;
       explodeParts.push({
         x,y,
         vx:Math.cos(ang)*sp, vy:Math.sin(ang)*sp,
-        life:1, r:2+Math.random()*4,
+        life:1, r:(2+Math.random()*4)*rMul,
         col: Math.random()<0.5?'255,160,40':'255,80,40'
       });
     }
@@ -5007,13 +5047,14 @@ function _applyModeKhusus(){ _applyGameMode(); }
       ctx.arc(p.x,p.y,p.r*p.life,0,Math.PI*2);
       ctx.fillStyle=`rgba(${p.col},${p.life})`;
       ctx.fill();
-      p.x+=p.vx; p.y+=p.vy; p.vy+=0.05; p.life-=0.025;
+      p.x+=p.vx; p.y+=p.vy; p.vy+=0.05; p.life-=0.012; // fade lebih lambat agar terlihat jelas
     });
     explodeParts=explodeParts.filter(p=>p.life>0);
   }
 
   function draw(){
     if(!active){ raf=null; return; }
+    if(!W||!H){ raf=requestAnimationFrame(draw); return; } // tunggu sampai ukuran valid
     t+=0.02;
     ctx.clearRect(0,0,W,H);
 
@@ -5038,7 +5079,7 @@ function _applyModeKhusus(){ _applyGameMode(); }
       drawRocketAt(pos.x,pos.y,angle,1);
     } else if(mode==='exploding'){
       modeT+=0.02;
-      if(modeT<0.05) spawnExplosion(checkpoint.x,checkpoint.y);
+      if(modeT<0.05) spawnExplosion(checkpoint.x,checkpoint.y,true); // ledakan besar saat gagal
       drawExplosion();
     } else if(mode==='success'){
       modeT+=0.02;
@@ -5049,7 +5090,7 @@ function _applyModeKhusus(){ _applyGameMode(); }
       drawRocketAt(x,y,angle,1-u*0.3);
       if(u>=1 && explodeParts.length===0){
         // tiba di planet — sedikit kilatan
-        spawnExplosion(planet.x,planet.y);
+        spawnExplosion(planet.x,planet.y,false); // kilatan kecil saat tiba di planet
       }
       drawExplosion();
     }
@@ -5060,7 +5101,15 @@ function _applyModeKhusus(){ _applyGameMode(); }
   window._rocketTrack = {
     start(){
       active=true; mode='idle'; modeT=0; explodeParts=[]; smoothProgress=0;
-      resize();
+      // retry resize beberapa kali via rAF, krn canvas baru di-set display:block
+      // dan offsetWidth/Height bisa masih 0 sesaat (race condition browser layout)
+      let tries=0;
+      function tryResize(){
+        const ok=resize();
+        tries++;
+        if(!ok && tries<10){ requestAnimationFrame(tryResize); }
+      }
+      tryResize();
       if(!raf) raf=requestAnimationFrame(draw);
     },
     stop(){
