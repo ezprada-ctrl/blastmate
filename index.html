@@ -586,6 +586,8 @@ body.mode-khusus .compare-msg { display: none !important; }
 body.mode-khusus .xp-result { display: none !important; }
 body.mode-khusus .result-streak { display: none !important; }
 body.mode-khusus #btn-edit-result { display: none !important; }
+body.mode-khusus #levelup-popup { display: none !important; }
+body.mode-khusus #btn-main-lagi { display: none !important; }
 </style>
 </head>
 <body>
@@ -970,7 +972,7 @@ body.mode-khusus #btn-edit-result { display: none !important; }
       <div class="result-streak" id="result-streak"></div>
       <div class="btn-row">
         <button class="btn-outline" id="btn-edit-result" onclick="handleEditClick()">Edit</button>
-        <button class="btn-blue" onclick="handleRestartClick()">Main lagi!</button>
+        <button class="btn-blue" id="btn-main-lagi" onclick="handleRestartClick()">Main lagi!</button>
         <button class="btn-lanjut" id="btn-lanjut-slide" onclick="handleLanjutClick()" disabled style="display:none">▶ Lanjut</button>
       </div>
       <div class="lanjut-lock-msg" id="lanjut-lock-msg">⚠️ Nilai kamu belum mencapai batas minimum. Ulangi kuis untuk bisa melanjutkan.</div>
@@ -1808,7 +1810,7 @@ function submitQuiz(){
 let pendingLvlCb=null;
 function checkLevelUp(oldCoins,newCoins,cb){
   const ol=getLvlIdx(oldCoins),nl=getLvlIdx(newCoins);
-  if(nl>ol){const lv=getLvl(newCoins);document.getElementById('lu-icon').textContent=lv.icon;document.getElementById('lu-name').textContent=lv.name;document.getElementById('levelup-popup').classList.add('show');pendingLvlCb=cb;}else cb();
+  if(nl>ol){if(isPlayerMode&&_sessionLinkType==='khusus'){cb();}else{const lv=getLvl(newCoins);document.getElementById('lu-icon').textContent=lv.icon;document.getElementById('lu-name').textContent=lv.name;document.getElementById('levelup-popup').classList.add('show');pendingLvlCb=cb;}}else cb();
 }
 function closeLevelUp(){document.getElementById('levelup-popup').classList.remove('show');if(pendingLvlCb){pendingLvlCb();pendingLvlCb=null;}}
 
@@ -2898,6 +2900,14 @@ document.addEventListener('click',e=>{
     const el=document.getElementById(id);
     if(el&&e.target===el)closeModal(id);
   });
+  // modal-retry-required: hanya bisa ditutup via tombol di mode Khusus
+  const retryEl=document.getElementById('modal-retry-required');
+  if(retryEl&&e.target===retryEl){
+    if(!isPlayerMode||_sessionLinkType!=='khusus'){
+      closeModal('modal-retry-required');
+    }
+    // di mode Khusus: tidak ditutup via backdrop
+  }
 });
 
 /* ===== RESULT BUTTON HANDLERS ===== */
