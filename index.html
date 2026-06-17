@@ -588,6 +588,9 @@ body.mode-khusus .result-streak { display: none !important; }
 body.mode-khusus #btn-edit-result { display: none !important; }
 body.mode-khusus #levelup-popup { display: none !important; }
 body.mode-khusus #btn-main-lagi { display: none !important; }
+body.mode-khusus #score-pill { display: none !important; }
+body.mode-khusus #streak-wrap { display: none !important; }
+body.mode-khusus #onfire-badge { display: none !important; }
 </style>
 </head>
 <body>
@@ -2717,6 +2720,11 @@ async function checkShareLink(){
     if(session.settings&&session.settings.quizType){
       quizType=session.settings.quizType;
       setQuizType(quizType);
+    }
+    // MODE KHUSUS: force sumatif agar tidak ada feedback benar/salah saat mengerjakan
+    if(session.settings&&session.settings.linkType==='khusus'){
+      quizType='sumatif';
+      setQuizType('sumatif');
     }
     if(session.settings&&session.settings.timerEnabled!==undefined){
       timerEnabled=!!session.settings.timerEnabled;
