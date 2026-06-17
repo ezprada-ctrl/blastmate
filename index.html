@@ -189,6 +189,25 @@ body.on-fire #fire-overlay{opacity:1}
 .btn-outline:hover{background:rgba(100,80,255,0.15)}
 .btn-blue{padding:10px 20px;font-size:14px;border-radius:10px;background:linear-gradient(135deg,#4a5fff,#9b5fff);color:#fff;border:none;cursor:none;transition:opacity .15s;box-shadow:0 0 16px rgba(100,80,255,0.4)}
 .btn-blue:hover{opacity:.88}
+.btn-lanjut{padding:10px 24px;font-size:14px;font-weight:600;border-radius:10px;background:linear-gradient(135deg,#1a8a4a,#2db86b);color:#fff;border:none;cursor:none;transition:opacity .15s,box-shadow .15s;box-shadow:0 0 18px rgba(40,180,100,0.45);letter-spacing:.04em}
+.btn-lanjut:hover:not(:disabled){opacity:.88;box-shadow:0 0 28px rgba(40,180,100,0.65)}
+.btn-lanjut:disabled{opacity:.3;cursor:not-allowed;box-shadow:none;filter:grayscale(0.5)}
+.lanjut-lock-msg{font-size:12px;color:#ff9966;margin-top:6px;display:none;text-align:center;line-height:1.4}
+.lanjut-lock-msg.show{display:block}
+.link-type-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
+.link-type-card{border:2px solid rgba(120,100,255,0.25);border-radius:14px;padding:16px 12px;cursor:pointer;background:rgba(255,255,255,0.03);transition:all .2s;text-align:center}
+.link-type-card:hover{border-color:rgba(160,130,255,0.6);background:rgba(100,80,255,0.1)}
+.link-type-card.selected{border-color:#a080ff;background:rgba(100,80,255,0.18);box-shadow:0 0 18px rgba(100,80,255,0.25)}
+.link-type-icon{font-size:28px;margin-bottom:8px}
+.link-type-name{font-size:14px;font-weight:700;color:#c8a0ff;margin-bottom:6px}
+.link-type-desc{font-size:11px;color:#7777aa;line-height:1.5}
+.minscore-wrap{margin:10px 0 4px;display:none}
+.minscore-wrap.show{display:block}
+.minscore-label{font-size:12px;color:#9988cc;margin-bottom:6px}
+.minscore-row{display:flex;align-items:center;gap:10px}
+.minscore-input{width:80px;padding:7px 12px;font-size:15px;font-weight:700;border-radius:8px;border:1px solid rgba(120,100,255,0.4);background:rgba(255,255,255,0.06);color:#c8d0ff;text-align:center;font-family:inherit;outline:none}
+.minscore-input:focus{border-color:rgba(160,130,255,0.8)}
+.minscore-hint{font-size:11px;color:#6655aa}
 
 #mobile-rocket-canvas{position:fixed;inset:0;z-index:1;pointer-events:none;display:none}
 @media (pointer:coarse){#mobile-rocket-canvas{display:block}#rocket-cursor{display:none}}
@@ -842,7 +861,7 @@ body.on-fire #fire-overlay{opacity:1}
           <h3>Bagikan Kuis</h3>
         </div>
         <div class="share-desc">Generate link unik yang bisa dibuka siapapun. Penerima link langsung masuk countdown dan mengerjakan soal dengan setting yang sama — termasuk backsound.</div>
-        <button class="btn-generate" id="btn-generate" onclick="generateShareLink()">
+        <button class="btn-generate" id="btn-generate" onclick="showModalLinkType()">
           <span id="btn-generate-icon">✨</span>
           <span id="btn-generate-label">Generate Link</span>
         </button>
@@ -943,7 +962,9 @@ body.on-fire #fire-overlay{opacity:1}
       <div class="btn-row">
         <button class="btn-outline" onclick="handleEditClick()">Edit</button>
         <button class="btn-blue" onclick="handleRestartClick()">Main lagi!</button>
+        <button class="btn-lanjut" id="btn-lanjut-slide" onclick="handleLanjutClick()" disabled style="display:none">▶ Lanjut</button>
       </div>
+      <div class="lanjut-lock-msg" id="lanjut-lock-msg">⚠️ Nilai kamu belum mencapai batas minimum. Ulangi kuis untuk bisa melanjutkan.</div>
     </div>
   </div>
 </div>
@@ -959,6 +980,48 @@ body.on-fire #fire-overlay{opacity:1}
       <text class="timer-label-text" x="38" y="50">WAKTU</text>
     </svg>
   </div>
+
+<!-- MODAL: RETRY REQUIRED (nilai < 70, player mode) -->
+<!-- MODAL: PILIH TYPE LINK GENERATE -->
+<div class="modal-overlay" id="modal-linktype">
+  <div class="modal-box">
+    <div class="modal-title">🔗 Pilih Jenis Link</div>
+    <div class="modal-sub">Pilih jenis link sesuai kebutuhan kamu</div>
+    <div class="link-type-grid">
+      <div class="link-type-card selected" id="ltype-umum" onclick="selectLinkType('umum')">
+        <div class="link-type-icon">🌐</div>
+        <div class="link-type-name">Umum</div>
+        <div class="link-type-desc">Untuk game bebas — cocok untuk anak-anak &amp; umum. Pemain bisa main ulang, ganti soal, lihat skor.</div>
+      </div>
+      <div class="link-type-card" id="ltype-khusus" onclick="selectLinkType('khusus')">
+        <div class="link-type-icon">🏛</div>
+        <div class="link-type-name">Khusus</div>
+        <div class="link-type-desc">Untuk pelatihan formal — nilai minimum diatur spesifik. Gagal = wajib ulangi. Lulus = lanjut ke materi berikutnya.</div>
+      </div>
+    </div>
+    <div class="minscore-wrap" id="minscore-wrap">
+      <div class="minscore-label">⚙️ Nilai minimum kelulusan</div>
+      <div class="minscore-row">
+        <input type="number" class="minscore-input" id="minscore-input" value="70" min="1" max="100" />
+        <span class="minscore-hint">Default 70 — ubah sesuai kebutuhan</span>
+      </div>
+    </div>
+    <div class="modal-btn-row" style="margin-top:14px">
+      <button class="modal-btn" onclick="closeModal('modal-linktype')">✕ Batal</button>
+      <button class="modal-btn primary" onclick="confirmLinkType()">✨ Generate Link</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-retry-required">
+  <div class="modal-box">
+    <div class="modal-title">⚠️ Belum Lulus</div>
+    <div class="modal-sub" id="modal-retry-sub">Nilai kamu belum mencapai batas minimum <strong style="color:#ffcc44">70</strong>. Kamu harus mengulang kuis untuk bisa melanjutkan ke materi berikutnya.</div>
+    <div class="modal-btn-row" style="flex-direction:column;gap:8px">
+      <button class="modal-btn primary" onclick="closeModal('modal-retry-required');retryPlayerQuiz()">🔄 Ulangi Kuis</button>
+    </div>
+  </div>
+</div>
 
 <!-- MODAL: RESTART CHOICE -->
 <div class="modal-overlay" id="modal-restart">
@@ -1785,6 +1848,9 @@ function showResult(){
   else if(maxStreak>=2)parts.push(`Streak terpanjang: ${maxStreak}`);
   if(bestStreak>0)parts.push(`Rekor streak all-time: ${bestStreak}`);
   sEl.textContent=parts.join(' · ');
+
+  // ===== LANJUT BUTTON LOGIC (player mode only) =====
+  _updateLanjutButton();
 }
 
 /* ===== SAFE DOM HELPERS (editor elements not present on player side) ===== */
@@ -2513,7 +2579,7 @@ async function supaFetch(path,opts={}){
 
 /* ===== GENERATE SHARE LINK ===== */
 let currentShareURL='';
-async function generateShareLink(){
+async function generateShareLink(linkType, minScore){
   const btn=document.getElementById('btn-generate');
   const progWrap=document.getElementById('share-progress');
   const progFill=document.getElementById('share-prog-fill');
@@ -2553,7 +2619,7 @@ async function generateShareLink(){
     setShareProg(70,'Menyimpan soal ke database...');
     const payload={
       questions:questions,
-      settings:{musicVolume,musicApplied:musicApplied&&!!musicObjectURL,editorPwd:editorPassword||'',quizType,timerEnabled,timerMinutes},
+      settings:{musicVolume,musicApplied:musicApplied&&!!musicObjectURL,editorPwd:editorPassword||'',quizType,timerEnabled,timerMinutes,linkType:linkType||'umum',minScore:minScore||70},
       music_url:musicStorageURL,
       music_filename:musicStorageName
     };
@@ -2644,6 +2710,11 @@ async function checkShareLink(){
     if(session.settings&&session.settings.timerEnabled!==undefined){
       timerEnabled=!!session.settings.timerEnabled;
       if(session.settings.timerMinutes)timerMinutes=session.settings.timerMinutes;
+    // Load linkType dan minScore
+    if(session.settings){
+      _sessionLinkType=session.settings.linkType||'umum';
+      _sessionMinScore=typeof session.settings.minScore==='number'?session.settings.minScore:70;
+    }
     }
     document.getElementById('loading-sub').textContent='Soal berhasil dimuat...';
     // sync qcount UI with loaded question count
@@ -2729,6 +2800,8 @@ function onReadyClick(){
 /* ===== PASSWORD SYSTEM ===== */
 let editorPassword=''; // set by creator
 let isPlayerMode=false; // true when opened via share link
+let _sessionLinkType='umum'; // 'umum' atau 'khusus'
+let _sessionMinScore=70;
 let _currentSessionId=''; // session ID dari URL
 let _playerNameKey='';    // localStorage key untuk nama player di session ini
 let _playerNameForSession=''; // nama player untuk session ini
@@ -4430,6 +4503,135 @@ function buildImportPreview(qs){
   container.style.display='block';
   // scroll to preview
   setTimeout(()=>container.scrollIntoView({behavior:'smooth',block:'start'}),200);
+}
+
+/* ===== LANJUT KE SLIDE BERIKUTNYA (PLAYER MODE ONLY) ===== */
+
+// minScore diambil dari _sessionMinScore (set saat load session)
+
+function _isPassScore() {
+  if (!questions || questions.length === 0) return false;
+  const pct = Math.round((score / questions.length) * 100);
+  return pct >= _sessionMinScore;
+}
+
+function _updateLanjutButton() {
+  const btn = document.getElementById('btn-lanjut-slide');
+  const lockMsg = document.getElementById('lanjut-lock-msg');
+  if (!btn) return;
+
+  // Hanya tampilkan tombol lanjut di player mode KHUSUS
+  if (!isPlayerMode || _sessionLinkType !== 'khusus') {
+    btn.style.display = 'none';
+    if (lockMsg) lockMsg.classList.remove('show');
+    return;
+  }
+
+  btn.style.display = 'inline-flex';
+  btn.style.alignItems = 'center';
+  btn.style.gap = '6px';
+
+  if (_isPassScore()) {
+    btn.disabled = false;
+    if (lockMsg) lockMsg.classList.remove('show');
+  } else {
+    btn.disabled = true;
+    if (lockMsg) lockMsg.classList.add('show');
+    // Tampilkan modal peringatan setelah animasi result selesai
+    setTimeout(() => {
+      const actualScore = Math.round((score / questions.length) * 100);
+      const subEl = document.getElementById('modal-retry-sub');
+      if (subEl) {
+        subEl.innerHTML = `Nilai kamu <strong style="color:#ff9966">${actualScore}</strong> — belum mencapai batas minimum <strong style="color:#ffcc44">${_sessionMinScore}</strong>.<br><br>Kamu harus mengulang kuis untuk bisa melanjutkan ke materi berikutnya.`;
+      }
+      // Update lock message juga
+      const lockMsg = document.getElementById('lanjut-lock-msg');
+      if (lockMsg) lockMsg.textContent = `⚠️ Nilai kamu ${actualScore} — belum mencapai minimum ${_sessionMinScore}. Ulangi kuis.`;
+      showModal('modal-retry-required');
+    }, 1800);
+  }
+}
+
+function retryPlayerQuiz() {
+  // Acak ulang soal dari pool yang sama lalu restart
+  if (questions && questions.length > 0) {
+    questions = questions.slice().sort(() => Math.random() - 0.5);
+  }
+  launchCountdown(true);
+}
+
+function handleLanjutClick() {
+  if (!_isPassScore()) return;
+  _sendLanjutSignal();
+}
+
+function _sendLanjutSignal() {
+  const SIGNAL = 'storyline_next_slide';
+
+  // 1. postMessage ke parent (Storyline iframe)
+  try {
+    window.parent.postMessage(SIGNAL, '*');
+  } catch(e) {}
+
+  // 2. postMessage ke top (fallback nested iframe)
+  try {
+    if (window.top !== window.parent) {
+      window.top.postMessage(SIGNAL, '*');
+    }
+  } catch(e) {}
+
+  // 3. localStorage polling fallback
+  try {
+    localStorage.setItem('storyline_lanjut', Date.now().toString());
+  } catch(e) {}
+
+  // 4. Storyline GetPlayer API langsung (jika tersedia di scope parent)
+  try {
+    const player = window.parent.GetPlayer ? window.parent.GetPlayer() :
+                   (window.top.GetPlayer ? window.top.GetPlayer() : null);
+    if (player && typeof player.nextSlide === 'function') {
+      player.nextSlide();
+    }
+  } catch(e) {}
+}
+
+// Self-listener: konfirmasi signal diterima (untuk debug)
+window.addEventListener('message', function(e) {
+  if (e.data === 'storyline_next_slide_ack') {
+    // Signal acknowledged by Storyline — do nothing, navigation handled
+  }
+});
+
+/* ===== LINK TYPE MODAL ===== */
+let _selectedLinkType = 'umum';
+
+function showModalLinkType() {
+  _selectedLinkType = 'umum';
+  selectLinkType('umum');
+  showModal('modal-linktype');
+}
+
+function selectLinkType(type) {
+  _selectedLinkType = type;
+  document.getElementById('ltype-umum').classList.toggle('selected', type === 'umum');
+  document.getElementById('ltype-khusus').classList.toggle('selected', type === 'khusus');
+  const minWrap = document.getElementById('minscore-wrap');
+  if (type === 'khusus') {
+    minWrap.classList.add('show');
+  } else {
+    minWrap.classList.remove('show');
+  }
+}
+
+function confirmLinkType() {
+  let minScore = 70;
+  if (_selectedLinkType === 'khusus') {
+    const inp = document.getElementById('minscore-input');
+    const val = parseInt(inp.value);
+    minScore = (!isNaN(val) && val > 0) ? val : 70;
+  }
+  closeModal('modal-linktype');
+  generateShareLink(_selectedLinkType, minScore);
 }
 
 function loadScriptOnce(src){
