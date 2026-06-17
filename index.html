@@ -591,6 +591,10 @@ body.mode-khusus #btn-main-lagi { display: none !important; }
 body.mode-khusus #score-pill { display: none !important; }
 body.mode-khusus #streak-wrap { display: none !important; }
 body.mode-khusus #onfire-badge { display: none !important; }
+body.mode-khusus #fire-overlay { display: none !important; }
+body.mode-khusus.on-fire #bg-canvas { filter: none !important; }
+body.mode-khusus #corner-fire { display: none !important; }
+.opt-btn.selected-neutral{background:rgba(120,100,255,0.18);border-color:rgba(160,130,255,0.6);color:#c8d0ff;cursor:default;}
 </style>
 </head>
 <body>
@@ -1397,7 +1401,7 @@ function applyStreakLevel(){
     wrap.classList.add('s5');qbox.classList.add('s5');
     icon.textContent='🔥';lbl.textContent='ON FIRE';
     corner.classList.remove('show');
-    if(!onFireMode){
+    if(!onFireMode&&!(isPlayerMode&&_sessionLinkType==='khusus')){
       onFireMode=true;
       document.body.classList.add('on-fire');
       startFire();
@@ -1694,7 +1698,14 @@ function renderQ(){
         else btn.classList.add('striked');
       } else {
         // during quiz: respect quizType
-        if(i===userAnswers[currentQ]&&userAnswers[currentQ]!==q.ans){
+        if(isPlayerMode && _sessionLinkType==='khusus'){
+          // MODE KHUSUS: tampilkan netral — hanya tandai pilihan user, tanpa benar/salah
+          if(i===userAnswers[currentQ]){
+            btn.classList.add('selected-neutral');
+          } else {
+            btn.classList.add('striked');
+          }
+        } else if(i===userAnswers[currentQ]&&userAnswers[currentQ]!==q.ans){
           btn.classList.add('wrong'); // always show the wrong one user picked
         } else if(i===q.ans&&quizType==='formatif'){
           btn.classList.add('correct'); // only show correct if formatif
