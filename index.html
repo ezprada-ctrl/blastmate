@@ -311,11 +311,12 @@ body.on-fire #fire-overlay{opacity:1}
 .qtype-header{display:flex;align-items:center;gap:8px;margin-bottom:12px}
 .qtype-icon{font-size:18px;flex-shrink:0}
 .qtype-label{font-size:13px;font-weight:500;color:#c8c0ff;flex:1}
-.qtype-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.qtype-btns{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
 .qtype-btn{padding:10px 8px;border-radius:10px;border:1px solid rgba(120,100,255,0.3);background:rgba(255,255,255,0.04);color:#9999cc;cursor:pointer;font-size:13px;font-weight:500;text-align:center;transition:all .18s;display:flex;flex-direction:column;align-items:center;gap:3px}
 .qtype-btn:hover{background:rgba(100,80,255,0.15);border-color:rgba(150,130,255,0.5);color:#c8c0ff}
 .qtype-btn.active{background:rgba(100,80,255,0.25);border-color:rgba(170,140,255,0.7);color:#fff;box-shadow:0 0 12px rgba(120,80,255,0.3)}
 .qtype-btn.active.sumatif{background:rgba(255,140,0,0.2);border-color:rgba(255,160,0,0.6);color:#ffcc44;box-shadow:0 0 12px rgba(255,140,0,0.25)}
+.qtype-btn.active.pretest{background:rgba(0,180,200,0.2);border-color:rgba(0,200,220,0.6);color:#5ff2ff;box-shadow:0 0 12px rgba(0,200,220,0.25)}
 .qtype-btn-icon{font-size:18px}
 .qtype-btn-sub{font-size:10px;color:#7777aa;margin-top:1px}
 .qtype-btn.active .qtype-btn-sub{color:rgba(255,255,255,0.6)}
@@ -603,7 +604,28 @@ body.mode-gamify-off #rocket-scene { display: none !important; }
 /* Elemen navigasi — hanya disembunyikan khusus mode Khusus (link diklat), TIDAK di Sumatif murni */
 body.mode-khusus #btn-edit-result { display: none !important; }
 body.mode-khusus #btn-main-lagi { display: none !important; }
+
+/* ===== PRE-TEST: ganti Edit+Main Lagi jadi tombol Materi tunggal, beri jarak ke result box ===== */
+body.mode-pretest #btn-edit-result { display: none !important; }
+body.mode-pretest #btn-main-lagi { display: none !important; }
+body.mode-pretest #btn-materi-slide { display: inline-flex !important; align-items: center; gap: 6px; }
+body.mode-pretest #btn-lanjut-slide { display: none !important; }
+body.mode-pretest .pretest-note { margin-bottom: 22px; }
 .opt-btn.selected-neutral{background:rgba(120,100,255,0.18);border-color:rgba(160,130,255,0.6);color:#c8d0ff;cursor:default;}
+
+/* ===== MODE PRE-TEST: sembunyikan peta level/XP/koin, TAPI streak counter + fire effect tetap nyala ===== */
+body.mode-pretest .xp-section { display: none !important; }
+body.mode-pretest .stars-row { display: none !important; }
+body.mode-pretest .score-compare { display: none !important; }
+body.mode-pretest .compare-msg { display: none !important; }
+body.mode-pretest .xp-result { display: none !important; }
+body.mode-pretest #levelup-popup { display: none !important; }
+body.mode-pretest .prog-bar { display: none !important; }
+body.mode-pretest #rocket-scene { display: none !important; }
+.pretest-note{margin-top:10px;padding:14px 16px;border-radius:12px;font-size:13px;line-height:1.6;text-align:left}
+.pretest-note.pretest-fail{background:rgba(255,90,60,0.1);border:1px solid rgba(255,100,70,0.3);color:#ffb8a8}
+.pretest-note.pretest-pass{background:rgba(80,200,120,0.1);border:1px solid rgba(80,200,120,0.3);color:#a8ffc0}
+.pretest-note-icon{font-size:22px;margin-right:6px}
 </style>
 </head>
 <body>
@@ -839,6 +861,11 @@ body.mode-khusus #btn-main-lagi { display: none !important; }
             <span>Sumatif</span>
             <span class="qtype-btn-sub">Jawaban benar disembunyikan</span>
           </button>
+          <button class="qtype-btn pretest" id="qtype-pretest" onclick="setQuizType('pretest')">
+            <span class="qtype-btn-icon">🔬</span>
+            <span>Pre-test</span>
+            <span class="qtype-btn-sub">Cek kompetensi awal</span>
+          </button>
         </div>
       </div>
       <!-- END QUIZ TYPE -->
@@ -987,9 +1014,11 @@ body.mode-khusus #btn-main-lagi { display: none !important; }
       <div class="xp-result" id="xp-result"></div>
       <div class="result-sub" id="result-sub"></div>
       <div class="result-streak" id="result-streak"></div>
+      <div class="pretest-note" id="pretest-note" style="display:none"></div>
       <div class="btn-row">
         <button class="btn-outline" id="btn-edit-result" onclick="handleEditClick()">Edit</button>
         <button class="btn-blue" id="btn-main-lagi" onclick="handleRestartClick()">Main lagi!</button>
+        <button class="btn-lanjut" id="btn-materi-slide" onclick="handleMateriClick()" style="display:none">📘 Materi</button>
         <button class="btn-lanjut" id="btn-lanjut-slide" onclick="handleLanjutClick()" disabled style="display:none">▶ Lanjut</button>
       </div>
       <div class="lanjut-lock-msg" id="lanjut-lock-msg">⚠️ Nilai kamu belum mencapai batas minimum. Ulangi kuis untuk bisa melanjutkan.</div>
@@ -1877,10 +1906,12 @@ function renderQ(){
       hideMonsterBubble();
     }
   } else if(userAnswers[currentQ]!==null&&!submitted){
-    const wasBreak=(answeredCorrectly[currentQ]===false&&streak===0);
     showMonsterBubble(answeredCorrectly[currentQ],onFireMode&&answeredCorrectly[currentQ],false);
-  } else if(submitted&&answeredCorrectly[currentQ]!==null){
+  } else if(submitted&&answeredCorrectly[currentQ]!==null&&quizType!=='pretest'){
     showMonsterBubble(answeredCorrectly[currentQ],false,false);
+  } else if(submitted&&quizType==='pretest'){
+    // Pre-test setelah submit: tetap sembunyikan reveal jawaban benar/salah per-soal di review akhir
+    hideMonsterBubble();
   } else {
     hideMonsterBubble();
   }
@@ -1888,6 +1919,7 @@ function renderQ(){
   const optsEl=document.getElementById('opts');optsEl.innerHTML='';
   const isAnswered=userAnswers[currentQ]!==null&&!submitted;
   const isSumatifNow = quizType==='sumatif';
+  const isPretestNow = quizType==='pretest';
   const isGamifyOffNow = (isPlayerMode&&_sessionLinkType==='khusus')||isSumatifNow;
   q.opts.forEach((o,i)=>{
     const btn=document.createElement('button');btn.className='opt-btn';btn.textContent=o;
@@ -1914,6 +1946,17 @@ function renderQ(){
         btn.classList.add('striked');
       }
       btn.onclick=()=>selectAnswer(i);
+    } else if(isPretestNow&&isAnswered){
+      // MODE PRE-TEST: terkunci setelah dijawab. Benar -> reveal normal. Salah -> JANGAN reveal jawaban benar.
+      btn.disabled=true;
+      const wasCorrect=answeredCorrectly[currentQ];
+      if(wasCorrect){
+        if(i===q.ans)btn.classList.add('correct');
+        else btn.classList.add('striked');
+      } else {
+        if(i===userAnswers[currentQ])btn.classList.add('wrong');
+        else btn.classList.add('striked'); // opsi benar TIDAK dihighlight hijau
+      }
     } else if(isAnswered){
       btn.disabled=true;
       if(i===userAnswers[currentQ]&&userAnswers[currentQ]!==q.ans){
@@ -1985,7 +2028,8 @@ function selectAnswer(idx){
     return;
   }
 
-  // FORMATIF: behavior normal
+  // FORMATIF & PRE-TEST: feedback benar/salah real-time
+  const isPretestFlow = quizType==='pretest';
   sfxClick();
   if(correct){
     score++;streak++;
@@ -2007,26 +2051,42 @@ function selectAnswer(idx){
     } else {
       showMonsterBubble(false,false,false);
     }
-    // rocket damage
-    const wrongCount=answeredCorrectly.filter(a=>a===false).length;
-    if(window._rocketScene)window._rocketScene.addDamage(wrongCount,questions.length);
     sfxSmallExplosion();
+    // rocket damage — pakai rocket lama utk Formatif, rocket-track utk Pre-test
+    if(!isPretestFlow){
+      const wrongCount=answeredCorrectly.filter(a=>a===false).length;
+      if(window._rocketScene)window._rocketScene.addDamage(wrongCount,questions.length);
+    }
   }
 
-  // update buttons formatif
+  // update buttons — Formatif reveal penuh, Pre-test sembunyikan jawaban benar saat salah
   const btns=document.getElementById('opts').querySelectorAll('.opt-btn');
   btns.forEach((btn,i)=>{
     btn.disabled=true;
-    if(i===idx&&!correct){
-      btn.classList.add('wrong');
-    } else if(i===q.ans){
-      btn.classList.add('correct');
+    if(isPretestFlow){
+      if(correct){
+        if(i===q.ans)btn.classList.add('correct');
+        else btn.classList.add('striked');
+      } else {
+        if(i===idx)btn.classList.add('wrong');
+        else btn.classList.add('striked'); // opsi benar TIDAK dihighlight hijau
+      }
     } else {
-      btn.classList.add('striked');
+      if(i===idx&&!correct){
+        btn.classList.add('wrong');
+      } else if(i===q.ans){
+        btn.classList.add('correct');
+      } else {
+        btn.classList.add('striked');
+      }
     }
   });
 
   updateDots();updateAnsweredCount();
+  if(isPretestFlow){
+    _updateRocketTrackProgress();
+    _checkProgressMilestone();
+  }
   if(currentQ<questions.length-1)setTimeout(()=>navQ(1),1500);
 }
 
@@ -2041,11 +2101,13 @@ function submitQuiz(){
   _exitFire();renderQ();
 
   const isGamifyOffFlow = (isPlayerMode&&_sessionLinkType==='khusus')||quizType==='sumatif';
-  // passScore: pakai _sessionMinScore dinamis utk mode Khusus, default 70% utk Sumatif murni/Formatif
-  const minPct = (isPlayerMode&&_sessionLinkType==='khusus') ? (_sessionMinScore/100) : 0.7;
+  const isPretestSubmitFlow = quizType==='pretest';
+  const useTrackFlow = isGamifyOffFlow||isPretestSubmitFlow;
+  // passScore: Khusus pakai _sessionMinScore dinamis, Pre-test pakai 65%, default 70% utk Sumatif murni/Formatif
+  const minPct = (isPlayerMode&&_sessionLinkType==='khusus') ? (_sessionMinScore/100) : (isPretestSubmitFlow ? 0.65 : 0.7);
   const passScore=score/questions.length>=minPct;
 
-  if(isGamifyOffFlow){
+  if(useTrackFlow){
     // ROKET TRACK BARU: pastikan posisi akhir = semua soal terjawab, lalu trigger fail/success
     if(window._rocketTrack){
       window._rocketTrack.setAnsweredCount(questions.length);
@@ -2056,7 +2118,9 @@ function submitQuiz(){
     }
     // beri waktu animasi roket (terbang ke planet / meledak) selesai dimainkan dulu
     // sebelum popup result muncul menutupi layar
-    setTimeout(()=>checkLevelUp(oldCoins,totalCoins,()=>showResult()),3000);
+    // Pre-test: delay lebih panjang supaya user punya waktu menyimak sebelum result + note kompetensi muncul
+    const resultDelay = isPretestSubmitFlow ? 4200 : 3000;
+    setTimeout(()=>checkLevelUp(oldCoins,totalCoins,()=>showResult()),resultDelay);
     return;
   } else if(passScore){
     sfxTakeoff();
@@ -2071,7 +2135,7 @@ function submitQuiz(){
 let pendingLvlCb=null;
 function checkLevelUp(oldCoins,newCoins,cb){
   const ol=getLvlIdx(oldCoins),nl=getLvlIdx(newCoins);
-  if(nl>ol){if((isPlayerMode&&_sessionLinkType==='khusus')||quizType==='sumatif'){cb();}else{const lv=getLvl(newCoins);document.getElementById('lu-icon').textContent=lv.icon;document.getElementById('lu-name').textContent=lv.name;document.getElementById('levelup-popup').classList.add('show');pendingLvlCb=cb;}}else cb();
+  if(nl>ol){if((isPlayerMode&&_sessionLinkType==='khusus')||quizType==='sumatif'||quizType==='pretest'){cb();}else{const lv=getLvl(newCoins);document.getElementById('lu-icon').textContent=lv.icon;document.getElementById('lu-name').textContent=lv.name;document.getElementById('levelup-popup').classList.add('show');pendingLvlCb=cb;}}else cb();
 }
 function closeLevelUp(){document.getElementById('levelup-popup').classList.remove('show');if(pendingLvlCb){pendingLvlCb();pendingLvlCb=null;}}
 
@@ -2090,6 +2154,9 @@ function showResult(){
     const passThresh=Math.ceil(questions.length*0.7);
     if(score>=passThresh){emoji='🥳';title='Luar biasa! Kamu berhasil!';}
     else{emoji='😢';title='Semangat! Coba lagi ya!';}
+  } else if(quizType==='pretest'){
+    if(pct>=0.65){emoji='🎉';title='Keren banget!';}
+    else{emoji='💪';title='Semangat belajar!';}
   } else {
     const titles=[[1,'🏆','Sempurna!'],[.8,'🌟','Hebat sekali!'],[.6,'😊','Bagus!'],[.4,'💪','Semangat!'],[0,'📚','Ayo belajar lagi!']];
     [,emoji,title]=titles.find(([t])=>pct>=t);
@@ -2120,6 +2187,23 @@ function showResult(){
   else if(maxStreak>=2)parts.push(`Streak terpanjang: ${maxStreak}`);
   if(bestStreak>0)parts.push(`Rekor streak all-time: ${bestStreak}`);
   sEl.textContent=parts.join(' · ');
+
+  // ===== PRE-TEST: tampilkan note kompetensi dasar =====
+  const pretestNoteEl=document.getElementById('pretest-note');
+  if(pretestNoteEl){
+    if(quizType==='pretest'){
+      if(pct<0.65){
+        pretestNoteEl.className='pretest-note pretest-fail';
+        pretestNoteEl.innerHTML='<span class="pretest-note-icon">😟</span>Sepertinya kamu belum memenuhi kompetensi dasar Analitika Data Perpajakan. Silahkan pelajari materi dengan seksama untuk upgrade pengetahuanmu, ya!';
+      } else {
+        pretestNoteEl.className='pretest-note pretest-pass';
+        pretestNoteEl.innerHTML='<span class="pretest-note-icon">😄</span>Keren banget! Kamu sudah cukup baik di tingkat dasar, pertajam kemampuanmu lewat materi berikut ini ya!';
+      }
+      pretestNoteEl.style.display='block';
+    } else {
+      pretestNoteEl.style.display='none';
+    }
+  }
 
   // ===== LANJUT BUTTON LOGIC (player mode only) =====
   _updateLanjutButton();
@@ -3166,8 +3250,10 @@ function setQuizType(type){
   quizType=type;
   const fb=document.getElementById('qtype-formatif');
   const sb=document.getElementById('qtype-sumatif');
+  const pb=document.getElementById('qtype-pretest');
   if(fb)fb.className='qtype-btn'+(type==='formatif'?' active':'');
   if(sb)sb.className='qtype-btn sumatif'+(type==='sumatif'?' active':'');
+  if(pb)pb.className='qtype-btn pretest'+(type==='pretest'?' active':'');
   if(typeof _applyGameMode==='function')_applyGameMode();
 }
 
@@ -4886,6 +4972,11 @@ function handleLanjutClick() {
   _sendLanjutSignal();
 }
 
+function handleMateriClick() {
+  // Pre-test: selalu boleh lanjut ke materi/slide berikutnya, terlepas dari skor
+  _sendLanjutSignal();
+}
+
 function _sendLanjutSignal() {
   const SIGNAL = 'storyline_next_slide';
 
@@ -4958,15 +5049,19 @@ function confirmLinkType() {
 /* ===== MODE KHUSUS & SUMATIF MURNI: apply body classes ===== */
 function _applyGameMode() {
   const isKhusus = isPlayerMode && _sessionLinkType === 'khusus';
+  const isPretest = quizType === 'pretest';
   // mode-khusus: restriksi penuh (navigasi + gamifikasi) — hanya link Khusus
   document.body.classList.toggle('mode-khusus', isKhusus);
-  // mode-gamify-off: hanya sembunyikan gamifikasi — berlaku utk Khusus DAN Sumatif murni
+  // mode-gamify-off: hanya sembunyikan gamifikasi — berlaku utk Khusus DAN Sumatif murni (TIDAK Pre-test)
   const isGamifyOff = isKhusus || (quizType === 'sumatif');
   document.body.classList.toggle('mode-gamify-off', isGamifyOff);
+  // mode-pretest: sembunyikan XP/level/koin TAPI streak+fire tetap nyala, pakai rocket-track
+  document.body.classList.toggle('mode-pretest', isPretest);
 
-  // Toggle roket lama vs roket track baru
+  // Toggle roket lama vs roket track baru — berlaku utk gamify-off ATAU pretest
+  const useTrackRocket = isGamifyOff || isPretest;
   const trackCanvas = document.getElementById('rocket-track-scene');
-  if(isGamifyOff){
+  if(useTrackRocket){
     if(trackCanvas) trackCanvas.style.display='block';
     if(window._rocketScene) window._rocketScene.stop();
     if(window._rocketTrack){
