@@ -1561,11 +1561,122 @@ function showMonsterBubble(correct,isOnFire,isBreak){
 }
 function hideMonsterBubble(){stopMb();const b=document.getElementById('monster-bubble');b.className='';b.id='monster-bubble';try{document.getElementById('mb-canvas').getContext('2d').clearRect(0,0,80,80);}catch(e){}}
 
-/* ===== KARAKTER NETRAL (mode Sumatif/Khusus) — tidak membocorkan benar/salah ===== */
-const NEUTRAL_CHARS = ['👽','🛸','🪐','⭐','🌙'];
-const NEUTRAL_MSGS = [
-  'Oke, dicatat!','Sip, lanjut!','Tercatat dengan baik.','Siap, soal berikutnya!','Noted!','Baik, kita lanjutkan.'
+/* ===== KARAKTER NETRAL "COSMO" — astronot kecil, vektor custom (mode Sumatif/Khusus) ===== */
+const COSMO_MSGS = [
+  'Lanjut terus!','Aku temenin sampai akhir ya!','Tetap fokus, sedikit lagi!',
+  'Santai aja, kamu pasti bisa!','Yuk lanjut ke soal berikutnya!','Aku percaya sama kamu!'
 ];
+
+// --- helper gambar dasar Cosmo: helm bulat + suit + wajah ---
+function cosmoSuit(ctx,cy,sx,sy){
+  ctx.save();ctx.translate(40,cy);ctx.scale(sx,sy);
+  // badan suit (krem/putih)
+  ctx.fillStyle='#e8e4da';
+  ctx.beginPath();ctx.ellipse(0,16,15,16,0,0,Math.PI*2);ctx.fill();
+  // garis aksen suit
+  ctx.strokeStyle='#b8b0a0';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(-9,10);ctx.lineTo(-9,22);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(9,10);ctx.lineTo(9,22);ctx.stroke();
+  // chest badge kecil
+  ctx.fillStyle='#9b5fff';
+  ctx.beginPath();ctx.arc(0,14,2.5,0,Math.PI*2);ctx.fill();
+  ctx.restore();
+}
+function cosmoHelmet(ctx,cy,tilt){
+  ctx.save();ctx.translate(40,cy);ctx.rotate(tilt||0);
+  // helm bulat
+  ctx.fillStyle='#f5f3ee';
+  ctx.beginPath();ctx.arc(0,0,15,0,Math.PI*2);ctx.fill();
+  // visor/kaca helm
+  ctx.fillStyle='#cfe8ff';
+  ctx.beginPath();ctx.ellipse(0,1,11,10,0,0,Math.PI*2);ctx.fill();
+  // reflection kaca
+  ctx.fillStyle='rgba(255,255,255,0.55)';
+  ctx.beginPath();ctx.ellipse(-4,-4,4,3,0.5,0,Math.PI*2);ctx.fill();
+  ctx.restore();
+}
+function cosmoFaceHappy(ctx,cy,tilt,blink){
+  ctx.save();ctx.translate(40,cy);ctx.rotate(tilt||0);
+  if(blink){
+    ctx.strokeStyle='#2a2a3a';ctx.lineWidth=1.6;ctx.lineCap='round';
+    ctx.beginPath();ctx.moveTo(-6,0);ctx.lineTo(-2,0);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(2,0);ctx.lineTo(6,0);ctx.stroke();
+  } else {
+    ctx.fillStyle='#2a2a3a';
+    ctx.beginPath();ctx.ellipse(-4,0,1.8,2.2,0,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.ellipse(4,0,1.8,2.2,0,0,Math.PI*2);ctx.fill();
+  }
+  ctx.strokeStyle='#2a2a3a';ctx.lineWidth=1.6;ctx.lineCap='round';
+  ctx.beginPath();ctx.arc(0,3,4,0.15,Math.PI-0.15);ctx.stroke();
+  // pipi blush
+  ctx.fillStyle='rgba(255,150,150,0.4)';
+  ctx.beginPath();ctx.ellipse(-7,3,2,1.3,0,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.ellipse(7,3,2,1.3,0,0,Math.PI*2);ctx.fill();
+  ctx.restore();
+}
+function cosmoFaceWink(ctx,cy,tilt){
+  ctx.save();ctx.translate(40,cy);ctx.rotate(tilt||0);
+  ctx.strokeStyle='#2a2a3a';ctx.lineWidth=1.6;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(-6,0);ctx.lineTo(-2,0);ctx.stroke(); // mata kiri kedip
+  ctx.fillStyle='#2a2a3a';
+  ctx.beginPath();ctx.ellipse(4,0,1.8,2.2,0,0,Math.PI*2);ctx.fill(); // mata kanan buka
+  ctx.strokeStyle='#2a2a3a';ctx.lineWidth=1.6;
+  ctx.beginPath();ctx.moveTo(-4,4);ctx.quadraticCurveTo(0,7,5,3);ctx.stroke(); // senyum miring
+  ctx.restore();
+}
+
+// --- 4 animasi ekspresi ---
+function cosmoAnimNod(ctx,t){
+  // mengangguk semangat + tangan terangkat
+  const nod=Math.sin(t*6)*0.12, bob=Math.abs(Math.sin(t*6))*2;
+  cosmoSuit(ctx,46-bob*0.3,1,1);
+  // tangan kanan terangkat
+  ctx.save();ctx.translate(52,40-bob*0.3);ctx.rotate(-0.6-Math.sin(t*6)*0.15);
+  ctx.fillStyle='#e8e4da';ctx.beginPath();ctx.ellipse(0,0,3.2,8,0,0,Math.PI*2);ctx.fill();
+  ctx.restore();
+  cosmoHelmet(ctx,30-bob,nod);
+  cosmoFaceHappy(ctx,30-bob,nod,Math.sin(t*3)>0.9);
+}
+function cosmoAnimWink(ctx,t){
+  // kedip santai, badan bersandar rileks
+  const lean=Math.sin(t*2.2)*0.08, bob=Math.sin(t*2.2)*1.5;
+  cosmoSuit(ctx,46+bob*0.3,1,1);
+  cosmoHelmet(ctx,30+bob,lean);
+  cosmoFaceWink(ctx,30+bob,lean);
+}
+function cosmoAnimThumbsUp(ctx,t){
+  // jempol ke atas, mata berbinar
+  const bob=Math.sin(t*4)*2;
+  cosmoSuit(ctx,46-bob*0.2,1,1);
+  // tangan dengan jempol
+  ctx.save();ctx.translate(53,38-bob*0.2);ctx.rotate(-0.3);
+  ctx.fillStyle='#e8e4da';
+  ctx.beginPath();ctx.ellipse(0,0,3.5,6,0,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.ellipse(0,-6,1.8,3,0,0,Math.PI*2);ctx.fill(); // jempol
+  ctx.restore();
+  cosmoHelmet(ctx,30-bob*0.6,0.05);
+  cosmoFaceHappy(ctx,30-bob*0.6,0.05,false);
+  // kilau bintang kecil dekat mata
+  ctx.fillStyle='#FFD93D';ctx.font='9px sans-serif';
+  ctx.fillText('✦',48,22+Math.sin(t*5)*2);
+}
+function cosmoAnimFloat(ctx,t){
+  // melayang santai, tenang menyapa
+  const floatY=Math.sin(t*1.6)*3, tilt=Math.sin(t*1.6)*0.05;
+  cosmoSuit(ctx,46+floatY,1,1);
+  cosmoHelmet(ctx,30+floatY,tilt);
+  cosmoFaceHappy(ctx,30+floatY,tilt,false);
+  // partikel bintang melayang di sekitar
+  for(let i=0;i<2;i++){
+    const a=(t*0.8+i*Math.PI)%(Math.PI*2);
+    ctx.globalAlpha=0.6+0.3*Math.sin(t*2+i);
+    ctx.fillStyle='#C77DFF';ctx.font='8px sans-serif';
+    ctx.fillText('·',40+Math.cos(a)*24,30+floatY+Math.sin(a)*14);
+    ctx.globalAlpha=1;
+  }
+}
+const COSMO_ANIMS=[cosmoAnimNod,cosmoAnimWink,cosmoAnimThumbsUp,cosmoAnimFloat];
+
 function showNeutralCharacterReaction(){
   stopMb();
   const bubble=document.getElementById('monster-bubble');
@@ -1574,29 +1685,19 @@ function showNeutralCharacterReaction(){
   const tag=document.getElementById('mb-result-tag');
   const msg=document.getElementById('mb-msg');
 
-  const charIdx=~~(Math.random()*NEUTRAL_CHARS.length);
-  const char=NEUTRAL_CHARS[charIdx];
-  const text=NEUTRAL_MSGS[~~(Math.random()*NEUTRAL_MSGS.length)];
+  const animFn=COSMO_ANIMS[~~(Math.random()*COSMO_ANIMS.length)];
+  const text=COSMO_MSGS[~~(Math.random()*COSMO_MSGS.length)];
 
   tag.textContent='';tag.className='';
   msg.textContent=text;
   bubble.id='monster-bubble';bubble.className='show neutral-bg';
 
   ctx.clearRect(0,0,80,80);
-  ctx.font='40px sans-serif';
-  ctx.textAlign='center';ctx.textBaseline='middle';
-  let bobT=0;
   const start=performance.now();
   function frame(now){
     ctx.clearRect(0,0,80,80);
-    bobT=(now-start)/500;
-    const bob=Math.sin(bobT*3)*3;
-    ctx.save();
-    ctx.translate(40,40+bob);
-    ctx.font='40px sans-serif';
-    ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText(char,0,0);
-    ctx.restore();
+    const dt=(now-start)/1000;
+    animFn(ctx,dt);
     mbRAF=requestAnimationFrame(frame);
   }
   mbRAF=requestAnimationFrame(frame);
@@ -1771,11 +1872,10 @@ function renderQ(){
 
   // restore bubble for already-answered q
   if((isPlayerMode&&_sessionLinkType==='khusus')||quizType==='sumatif'){
-    // MODE KHUSUS & SUMATIF: sembunyikan bubble saat navigasi
-    if(!submitted) hideMonsterBubble();
-    else if(submitted&&answeredCorrectly[currentQ]!==null){
-      showMonsterBubble(answeredCorrectly[currentQ],false,false);
-    } else { hideMonsterBubble(); }
+    // MODE KHUSUS & SUMATIF: TIDAK PERNAH reveal benar/salah via bubble — termasuk setelah submit
+    if(!window._skipBubbleReset){
+      hideMonsterBubble();
+    }
   } else if(userAnswers[currentQ]!==null&&!submitted){
     const wasBreak=(answeredCorrectly[currentQ]===false&&streak===0);
     showMonsterBubble(answeredCorrectly[currentQ],onFireMode&&answeredCorrectly[currentQ],false);
@@ -1788,11 +1888,21 @@ function renderQ(){
   const optsEl=document.getElementById('opts');optsEl.innerHTML='';
   const isAnswered=userAnswers[currentQ]!==null&&!submitted;
   const isSumatifNow = quizType==='sumatif';
+  const isGamifyOffNow = (isPlayerMode&&_sessionLinkType==='khusus')||isSumatifNow;
   q.opts.forEach((o,i)=>{
     const btn=document.createElement('button');btn.className='opt-btn';btn.textContent=o;
-    if(submitted){
+    if(submitted&&isGamifyOffNow){
+      // MODE KHUSUS/SUMATIF: walau sudah submit, JANGAN reveal benar/salah —
+      // soal bisa muncul lagi di link generate lain, kebocoran di sini tetap berisiko
       btn.disabled=true;
-      // after submit: always reveal all answers
+      if(i===userAnswers[currentQ]){
+        btn.classList.add('selected-neutral');
+      } else {
+        btn.classList.add('striked');
+      }
+    } else if(submitted){
+      btn.disabled=true;
+      // after submit: always reveal all answers (mode Formatif/Umum saja)
       if(i===q.ans)btn.classList.add('correct');
       else if(i===userAnswers[currentQ]&&userAnswers[currentQ]!==q.ans)btn.classList.add('wrong');
       else btn.classList.add('striked');
@@ -1864,7 +1974,9 @@ function selectAnswer(idx){
       score=s; maxStreak=mx;
     }
     // disable/re-enable tombol tanpa highlight, beri karakter respon netral
+    window._skipBubbleReset=true;
     renderQ();
+    window._skipBubbleReset=false;
     updateDots();updateAnsweredCount();
     _updateRocketTrackProgress();
     _checkProgressMilestone();
