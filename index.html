@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
+html,body{scrollbar-width:none} /* Firefox: sembunyikan scrollbar visual, scroll tetap berfungsi */
+html::-webkit-scrollbar,body::-webkit-scrollbar{display:none;width:0;height:0} /* Chrome/Edge/Safari */
 body{font-family:'Segoe UI',sans-serif;background:#0a0a1a;min-height:100vh;overflow-x:hidden;color:#e8e8ff;cursor:none}
 #bg-canvas{position:fixed;inset:0;z-index:0;pointer-events:none;transition:filter 1s ease}
 body.on-fire #bg-canvas{filter:hue-rotate(25deg) saturate(1.8) brightness(1.15)}
