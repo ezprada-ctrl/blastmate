@@ -622,6 +622,10 @@ body.mode-pretest .xp-result { display: none !important; }
 body.mode-pretest #levelup-popup { display: none !important; }
 body.mode-pretest .prog-bar { display: none !important; }
 body.mode-pretest #rocket-scene { display: none !important; }
+/* Pre-test: rekor streak di result screen disembunyikan (player hanya main sekali, info historis tidak relevan).
+   Streak-wrap saat quiz berlangsung TETAP tampil — hanya bagian result-streak akhir yang disembunyikan. */
+body.mode-pretest .result-streak { display: none !important; }
+body.mode-pretest .result-sub { margin-bottom: 18px; }
 .pretest-note{margin-top:10px;padding:14px 16px;border-radius:12px;font-size:13px;line-height:1.6;text-align:left}
 .pretest-note.pretest-fail{background:rgba(255,90,60,0.1);border:1px solid rgba(255,100,70,0.3);color:#ffb8a8}
 .pretest-note.pretest-pass{background:rgba(80,200,120,0.1);border:1px solid rgba(80,200,120,0.3);color:#a8ffc0}
@@ -2103,7 +2107,8 @@ function submitQuiz(){
   const isGamifyOffFlow = (isPlayerMode&&_sessionLinkType==='khusus')||quizType==='sumatif';
   const isPretestSubmitFlow = quizType==='pretest';
   const useTrackFlow = isGamifyOffFlow||isPretestSubmitFlow;
-  // passScore: Khusus pakai _sessionMinScore dinamis, Pre-test pakai 65%, default 70% utk Sumatif murni/Formatif
+  // passScore: player via link Khusus pakai _sessionMinScore (Pre-test selalu lewat link Khusus, default 65).
+  // Preview lokal di editor (bukan player mode) belum punya _sessionMinScore dari link, fallback ke 65 utk Pre-test, 70 utk lainnya.
   const minPct = (isPlayerMode&&_sessionLinkType==='khusus') ? (_sessionMinScore/100) : (isPretestSubmitFlow ? 0.65 : 0.7);
   const passScore=score/questions.length>=minPct;
 
@@ -5018,6 +5023,22 @@ window.addEventListener('message', function(e) {
 let _selectedLinkType = 'umum';
 
 function showModalLinkType() {
+  const grid = document.querySelector('#modal-linktype .link-type-grid');
+  const subEl = document.querySelector('#modal-linktype .modal-sub');
+  // PRE-TEST: selalu link Khusus, skip pilihan Umum/Khusus — langsung tampilkan minScore (default 65)
+  if (quizType === 'pretest') {
+    _selectedLinkType = 'khusus';
+    if (grid) grid.style.display = 'none';
+    if (subEl) subEl.textContent = 'Pre-test selalu digenerate sebagai link Khusus — atur nilai minimum kelulusan di bawah';
+    const minWrap = document.getElementById('minscore-wrap');
+    if (minWrap) minWrap.classList.add('show');
+    const inp = document.getElementById('minscore-input');
+    if (inp) inp.value = 65;
+    showModal('modal-linktype');
+    return;
+  }
+  if (grid) grid.style.display = 'grid';
+  if (subEl) subEl.textContent = 'Pilih jenis link sesuai kebutuhan kamu';
   _selectedLinkType = 'umum';
   selectLinkType('umum');
   showModal('modal-linktype');
@@ -5036,11 +5057,12 @@ function selectLinkType(type) {
 }
 
 function confirmLinkType() {
-  let minScore = 70;
+  const defaultMin = (quizType === 'pretest') ? 65 : 70;
+  let minScore = defaultMin;
   if (_selectedLinkType === 'khusus') {
     const inp = document.getElementById('minscore-input');
     const val = parseInt(inp.value);
-    minScore = (!isNaN(val) && val > 0) ? val : 70;
+    minScore = (!isNaN(val) && val > 0) ? val : defaultMin;
   }
   closeModal('modal-linktype');
   generateShareLink(_selectedLinkType, minScore);
