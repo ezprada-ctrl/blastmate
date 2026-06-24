@@ -3104,7 +3104,8 @@ async function checkShareLink(){
       setQuizType(quizType);
     }
     // MODE KHUSUS: force sumatif agar tidak ada feedback benar/salah saat mengerjakan
-    if(session.settings&&session.settings.linkType==='khusus'){
+    // KECUALI Pre-test — Pre-test punya perilaku feedback sendiri (monster + benar/salah) walau link-nya khusus
+    if(session.settings&&session.settings.linkType==='khusus'&&quizType!=='pretest'){
       quizType='sumatif';
       setQuizType('sumatif');
     }
