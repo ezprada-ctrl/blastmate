@@ -1444,7 +1444,7 @@ function applyStreakLevel(){
     wrap.classList.add('s5');qbox.classList.add('s5');
     icon.textContent='🔥';lbl.textContent='ON FIRE';
     corner.classList.remove('show');
-    if(!onFireMode&&!((isPlayerMode&&_sessionLinkType==='khusus')||quizType==='sumatif')){
+    if(!onFireMode&&!((isPlayerMode&&_sessionLinkType==='khusus'&&quizType!=='pretest')||quizType==='sumatif')){
       onFireMode=true;
       document.body.classList.add('on-fire');
       startFire();
@@ -1904,7 +1904,8 @@ function renderQ(){
   applyStreakLevel();
 
   // restore bubble for already-answered q
-  if((isPlayerMode&&_sessionLinkType==='khusus')||quizType==='sumatif'){
+  const isKhususNonPretest = (isPlayerMode&&_sessionLinkType==='khusus'&&quizType!=='pretest');
+  if(isKhususNonPretest||quizType==='sumatif'){
     // MODE KHUSUS & SUMATIF: TIDAK PERNAH reveal benar/salah via bubble — termasuk setelah submit
     if(!window._skipBubbleReset){
       hideMonsterBubble();
@@ -1924,7 +1925,7 @@ function renderQ(){
   const isAnswered=userAnswers[currentQ]!==null&&!submitted;
   const isSumatifNow = quizType==='sumatif';
   const isPretestNow = quizType==='pretest';
-  const isGamifyOffNow = (isPlayerMode&&_sessionLinkType==='khusus')||isSumatifNow;
+  const isGamifyOffNow = isKhususNonPretest||isSumatifNow;
   q.opts.forEach((o,i)=>{
     const btn=document.createElement('button');btn.className='opt-btn';btn.textContent=o;
     if(submitted&&isGamifyOffNow){
@@ -2107,9 +2108,7 @@ function submitQuiz(){
   const isGamifyOffFlow = (isPlayerMode&&_sessionLinkType==='khusus')||quizType==='sumatif';
   const isPretestSubmitFlow = quizType==='pretest';
   const useTrackFlow = isGamifyOffFlow||isPretestSubmitFlow;
-  // passScore: player via link Khusus pakai _sessionMinScore (Pre-test selalu lewat link Khusus, default 65).
-  // Preview lokal di editor (bukan player mode) belum punya _sessionMinScore dari link, fallback ke 65 utk Pre-test, 70 utk lainnya.
-  const minPct = (isPlayerMode&&_sessionLinkType==='khusus') ? (_sessionMinScore/100) : (isPretestSubmitFlow ? 0.65 : 0.7);
+  const minPct = _getPassThresholdPct();
   const passScore=score/questions.length>=minPct;
 
   if(useTrackFlow){
@@ -2160,7 +2159,8 @@ function showResult(){
     if(score>=passThresh){emoji='🥳';title='Luar biasa! Kamu berhasil!';}
     else{emoji='😢';title='Semangat! Coba lagi ya!';}
   } else if(quizType==='pretest'){
-    if(pct>=0.65){emoji='🎉';title='Keren banget!';}
+    const pretestMinPct=_getPassThresholdPct();
+    if(pct>=pretestMinPct){emoji='🎉';title='Keren banget!';}
     else{emoji='💪';title='Semangat belajar!';}
   } else {
     const titles=[[1,'🏆','Sempurna!'],[.8,'🌟','Hebat sekali!'],[.6,'😊','Bagus!'],[.4,'💪','Semangat!'],[0,'📚','Ayo belajar lagi!']];
@@ -2197,7 +2197,8 @@ function showResult(){
   const pretestNoteEl=document.getElementById('pretest-note');
   if(pretestNoteEl){
     if(quizType==='pretest'){
-      if(pct<0.65){
+      const pretestMinPctNote=_getPassThresholdPct();
+      if(pct<pretestMinPctNote){
         pretestNoteEl.className='pretest-note pretest-fail';
         pretestNoteEl.innerHTML='<span class="pretest-note-icon">😟</span>Sepertinya kamu belum memenuhi kompetensi dasar Analitika Data Perpajakan. Silahkan pelajari materi dengan seksama untuk upgrade pengetahuanmu, ya!';
       } else {
@@ -3203,6 +3204,16 @@ let editorPassword=''; // set by creator
 let isPlayerMode=false; // true when opened via share link
 let _sessionLinkType='umum'; // 'umum' atau 'khusus'
 let _sessionMinScore=70;
+
+// Threshold kelulusan terpusat — dipakai di submitQuiz() & showResult() agar selalu konsisten,
+// termasuk saat admin custom minScore via modal generate link (utamanya utk Pre-test).
+function _getPassThresholdPct(){
+  if(isPlayerMode&&_sessionLinkType==='khusus'){
+    return _sessionMinScore/100;
+  }
+  // Preview lokal di editor (bukan player mode) belum punya _sessionMinScore dari link
+  return (quizType==='pretest') ? 0.65 : 0.7;
+}
 let _currentSessionId=''; // session ID dari URL
 let _playerNameKey='';    // localStorage key untuk nama player di session ini
 let _playerNameForSession=''; // nama player untuk session ini
@@ -4932,6 +4943,14 @@ function _updateLanjutButton() {
   const lockMsg = document.getElementById('lanjut-lock-msg');
   if (!btn) return;
 
+  // PRE-TEST: pakai tombol Materi sendiri (selalu aktif, tanpa gating skor) — skip logic tombol Lanjut Khusus ini sepenuhnya
+  if (quizType === 'pretest') {
+    btn.style.display = 'none';
+    if (lockMsg) lockMsg.classList.remove('show');
+    closeModal('modal-retry-required');
+    return;
+  }
+
   // Hanya tampilkan tombol lanjut di player mode KHUSUS
   if (!isPlayerMode || _sessionLinkType !== 'khusus') {
     btn.style.display = 'none';
@@ -5070,9 +5089,10 @@ function confirmLinkType() {
 
 /* ===== MODE KHUSUS & SUMATIF MURNI: apply body classes ===== */
 function _applyGameMode() {
-  const isKhusus = isPlayerMode && _sessionLinkType === 'khusus';
   const isPretest = quizType === 'pretest';
-  // mode-khusus: restriksi penuh (navigasi + gamifikasi) — hanya link Khusus
+  // isKhusus murni (BUKAN Pre-test) — Pre-test punya treatment sendiri via mode-pretest, walau link-nya selalu 'khusus'
+  const isKhusus = isPlayerMode && _sessionLinkType === 'khusus' && !isPretest;
+  // mode-khusus: restriksi penuh (navigasi + gamifikasi) — hanya link Khusus non-pretest
   document.body.classList.toggle('mode-khusus', isKhusus);
   // mode-gamify-off: hanya sembunyikan gamifikasi — berlaku utk Khusus DAN Sumatif murni (TIDAK Pre-test)
   const isGamifyOff = isKhusus || (quizType === 'sumatif');
